@@ -37,7 +37,7 @@
 }
 
 html {
-  scroll-behavior: smooth;
+  scroll-behavior: auto;
   font-size: 16px;
 }
 
@@ -442,6 +442,7 @@ button {
   justify-content: space-between;
   gap: 16px;
   padding-top: 18px;
+  padding-right: 224px;
   border-top: 1px solid rgba(255, 255, 255, 0.1);
   font-family: var(--font-mono);
   font-size: 0.7rem;
@@ -473,7 +474,10 @@ button {
    BAND 01 (LIGHT 暖米白): Selected Works · Bento Dither 展板
    ============================================================ */
 .works {
-  padding: 96px 0 112px;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  padding: 96px 0 46px;
 }
 
 .band-header {
@@ -481,7 +485,7 @@ button {
   align-items: flex-end;
   justify-content: space-between;
   gap: 32px;
-  margin-bottom: 54px;
+  margin-bottom: 28px;
 }
 
 .mono-kicker {
@@ -533,8 +537,8 @@ button {
   position: relative;
   display: block;
   width: 100%;
-  min-height: 560px;
-  padding: 20px;
+  min-height: 484px;
+  padding: 18px;
   border-radius: 6px;
   border: 1px solid rgba(17, 17, 17, 0.92);
   background: #060606;
@@ -621,7 +625,7 @@ button {
 .bento-card__viewport {
   position: relative;
   width: 100%;
-  height: 274px;
+  height: 232px;
   overflow: hidden;
   background: #040404;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
@@ -634,7 +638,7 @@ button {
 }
 
 .bento-card__copy {
-  padding: 20px 20px 18px;
+  padding: 16px 18px 14px;
   display: flex;
   flex-direction: column;
   flex: 1;
@@ -683,7 +687,10 @@ button {
    BAND 02 (DARK): 全屏实时 ASCII 银河星云 + 终端点线清单
    ============================================================ */
 .nebula {
-  padding: 112px 0 120px;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  padding: 96px 0 64px;
   overflow: hidden;
 }
 
@@ -827,7 +834,10 @@ button {
    BAND 03 (LIGHT 暖米白): 同心文字星轨 + 复古打孔票据联系卡
    ============================================================ */
 .contact {
-  padding: 104px 0 96px;
+  min-height: calc(100vh - 82px);
+  display: flex;
+  align-items: center;
+  padding: 96px 0 56px;
 }
 
 .contact__grid {
@@ -1464,6 +1474,7 @@ button {
   .hero__telemetry {
     flex-direction: column;
     align-items: flex-start;
+    padding-right: 0;
     gap: 6px;
   }
 
@@ -1494,6 +1505,145 @@ button {
     flex-direction: column;
     align-items: flex-start;
   }
+
+  .scene-hud {
+    display: none;
+  }
+}
+
+/* ============================================================
+   幕间非线性快切协同动效 & 右下角分幕游标（Scene HUD）
+   ============================================================ */
+.band .container {
+  transition: transform 620ms var(--ease), opacity 480ms ease;
+}
+
+.band.is-departing .container {
+  opacity: 0.42;
+  transform: scale(0.985);
+}
+
+.band.is-entering-down .container {
+  animation: sceneArriveDown 640ms var(--ease) both;
+}
+
+.band.is-entering-up .container {
+  animation: sceneArriveUp 640ms var(--ease) both;
+}
+
+@keyframes sceneArriveDown {
+  from {
+    opacity: 0.35;
+    transform: translateY(34px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes sceneArriveUp {
+  from {
+    opacity: 0.35;
+    transform: translateY(-34px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* 切入 Band 01 时三张 Bento 展板 3 拍错峰落位 */
+.works.is-entering-down .bento-card:nth-child(1),
+.works.is-entering-up .bento-card:nth-child(1) {
+  animation: cardStagger 560ms var(--ease) 40ms both;
+}
+
+.works.is-entering-down .bento-card:nth-child(2),
+.works.is-entering-up .bento-card:nth-child(2) {
+  animation: cardStagger 560ms var(--ease) 105ms both;
+}
+
+.works.is-entering-down .bento-card:nth-child(3),
+.works.is-entering-up .bento-card:nth-child(3) {
+  animation: cardStagger 560ms var(--ease) 170ms both;
+}
+
+@keyframes cardStagger {
+  from {
+    opacity: 0.25;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.scene-hud {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 60;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 4px;
+  background: rgba(16, 16, 16, 0.88);
+  color: var(--bright);
+  border: 1px solid rgba(244, 243, 238, 0.2);
+  backdrop-filter: blur(8px);
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  transition: background-color 240ms ease, color 240ms ease, border-color 240ms ease;
+}
+
+.scene-hud.scene-hud--light {
+  background: rgba(244, 243, 238, 0.92);
+  color: var(--ink);
+  border-color: rgba(17, 17, 17, 0.24);
+}
+
+.scene-hud__readout {
+  padding: 0 10px;
+  min-width: 132px;
+  text-align: center;
+  user-select: none;
+}
+
+.scene-hud__btn {
+  width: 24px;
+  height: 24px;
+  border: 1px solid transparent;
+  border-radius: 2px;
+  background: transparent;
+  display: grid;
+  place-items: center;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  line-height: 1;
+  transition: background-color 150ms ease, color 150ms ease, opacity 150ms ease;
+}
+
+.scene-hud__btn:hover:not(:disabled) {
+  background: currentColor;
+}
+
+.scene-hud__btn:hover:not(:disabled) {
+  background: var(--bright);
+  color: var(--void);
+}
+
+.scene-hud--light .scene-hud__btn:hover:not(:disabled) {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.scene-hud__btn:disabled {
+  opacity: 0.24;
+  cursor: default;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1502,7 +1652,10 @@ button {
   }
 
   .dock__ticker-track,
-  .orbit-spin {
+  .orbit-spin,
+  .band .container,
+  .bento-card {
     animation: none !important;
+    transition: none !important;
   }
 }

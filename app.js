@@ -1583,7 +1583,11 @@
     });
 
     menu.querySelectorAll("a").forEach(function (a) {
-      a.addEventListener("click", function () {
+      a.addEventListener("click", function (e) {
+        var href = a.getAttribute("href");
+        if (href && href.charAt(0) === "#" && goToSceneById(href.slice(1))) {
+          e.preventDefault();
+        }
         setMenu(false);
       });
     });
@@ -1599,8 +1603,10 @@
     if (minimap && lens) {
       minimap.querySelectorAll("[data-jump]").forEach(function (btn) {
         btn.addEventListener("click", function () {
-          var target = document.querySelector(btn.getAttribute("data-jump"));
-          if (target) target.scrollIntoView({ behavior: "smooth" });
+          var sel = btn.getAttribute("data-jump");
+          if (sel && sel.charAt(0) === "#") {
+            goToSceneById(sel.slice(1));
+          }
         });
       });
 
@@ -2100,9 +2106,245 @@
 
     $("hero-copy-email").addEventListener("click", handleCopy);
     $("copy-email-btn").addEventListener("click", handleCopy);
-    $("back-to-top").addEventListener("click", function () {
-      window.scrollTo({ top: 0, behavior: "smooth" });
+
+    // 站内快捷按钮全部统一走非线性物理快切
+    document.querySelectorAll('a[href^="#"]').forEach(function (a) {
+      if (a.closest("#dock-menu")) return;
+      a.addEventListener("click", function (e) {
+        var id = a.getAttribute("href").slice(1);
+        if (id && goToSceneById(id)) {
+          e.preventDefault();
+        }
+      });
     });
+
+    $("back-to-top").addEventListener("click", function () {
+      goToSceneById("lunar");
+    });
+  }
+
+  // ---------- 11. 幕间非线性物理快切引擎（Expo-Out 快起慢刹 + 防触控板连跳） ----------
+  var sceneDefs = [
+    { id: "lunar", label: "00 / 03 · LUNAR", light: false },
+    { id: "works", label: "01 / 03 · WORKS", light: true },
+    { id: "nebula", label: "02 / 03 · NEBULA", light: false },
+    { id: "contact", label: "03 / 03 · CONTACT", light: true },
+  ];
+
+  var sceneState = {
+    current: 0,
+    animating: false,
+    rafId: null,
+    lockUntil: 0,
+  };
+
+  function getSceneEl(idx) {
+    return sceneDefs[idx] ? $(sceneDefs[idx].id) : null;
+  }
+
+  function getSceneTargetY(idx) {
+    var sec = getSceneEl(idx);
+    if (!sec) return 0;
+    var maxScroll = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+    if (idx === 0) return 0;
+    if (idx === sceneDefs.length - 1) return Math.min(sec.offsetTop, maxScroll);
+    return Math.min(sec.offsetTop, maxScroll);
+  }
+
+  function syncSceneHUD(idx) {
+    sceneState.current = idx;
+    var def = sceneDefs[idx];
+    var hud = $("scene-hud");
+    var readout = $("scene-readout");
+    var prevBtn = $("scene-prev");
+    var nextBtn = $("scene-next");
+    if (!hud || !def) return;
+
+    readout.textContent = def.label;
+    hud.classList.toggle("scene-hud--light", !!def.light);
+    if (prevBtn) prevBtn.disabled = idx <= 0;
+    if (nextBtn) nextBtn.disabled = idx >= sceneDefs.length - 1;
+  }
+
+  function detectClosestScene() {
+    var y = window.scrollY + window.innerHeight * 0.42;
+    var best = 0;
+    for (var i = 0; i < sceneDefs.length; i++) {
+      var elSec = getSceneEl(i);
+      if (elSec && elSec.offsetTop <= y) best = i;
+    }
+    return best;
+  }
+
+  function goToScene(targetIdx) {
+    targetIdx = Math.max(0, Math.min(sceneDefs.length - 1, targetIdx));
+    var targetY = getSceneTargetY(targetIdx);
+    var prevIdx = sceneState.current;
+    var goingDown = targetIdx >= prevIdx;
+
+    if (sceneState.rafId) {
+      cancelAnimationFrame(sceneState.rafId);
+      sceneState.rafId = null;
+    }
+
+    // 清除所有幕的临时入场/退场类
+    sceneDefs.forEach(function (d) {
+      var s = $(d.id);
+      if (s) s.classList.remove("is-departing", "is-entering-down", "is-entering-up");
+    });
+
+    syncSceneHUD(targetIdx);
+
+    if (reduceMotion) {
+      window.scrollTo(0, targetY);
+      return true;
+    }
+
+    var startY = window.scrollY;
+    var delta = targetY - startY;
+    if (Math.abs(delta) < 2) return true;
+
+    // 触发旧幕微退 + 新幕错峰入场协同动效
+    var prevSec = getSceneEl(prevIdx);
+    var nextSec = getSceneEl(targetIdx);
+    if (prevSec && prevIdx !== targetIdx) prevSec.classList.add("is-departing");
+    if (nextSec && prevIdx !== targetIdx) {
+      void nextSec.offsetWidth;
+      nextSec.classList.add(goingDown ? "is-entering-down" : "is-entering-up");
+    }
+
+    var duration = 660; // 快起慢刹总时长
+    var startTime = performance.now();
+    sceneState.animating = true;
+    sceneState.lockUntil = startTime + 740; // 吃掉触控板惯性尾波，防一滑连跳两幕
+
+    // 非线性强张力 Expo-Out：前 22% 时间疾驰过 80% 路程，后程磁吸丝滑刹停
+    function easeOutExpo(t) {
+      return t >= 1 ? 1 : 1 - Math.pow(2, -10.5 * t);
+    }
+
+    function step(now) {
+      var elapsed = now - startTime;
+      var t = Math.min(1, elapsed / duration);
+      var eased = easeOutExpo(t);
+      window.scrollTo(0, Math.round(startY + delta * eased));
+
+      if (t < 1) {
+        sceneState.rafId = requestAnimationFrame(step);
+      } else {
+        sceneState.rafId = null;
+        sceneState.animating = false;
+        window.scrollTo(0, targetY);
+        setTimeout(function () {
+          if (prevSec) prevSec.classList.remove("is-departing");
+          if (nextSec) nextSec.classList.remove("is-entering-down", "is-entering-up");
+        }, 120);
+      }
+    }
+
+    sceneState.rafId = requestAnimationFrame(step);
+    return true;
+  }
+
+  function goToSceneById(id) {
+    for (var i = 0; i < sceneDefs.length; i++) {
+      if (sceneDefs[i].id === id) {
+        return goToScene(i);
+      }
+    }
+    return false;
+  }
+
+  function initCinematicScenes() {
+    var prevBtn = $("scene-prev");
+    var nextBtn = $("scene-next");
+    if (prevBtn) {
+      prevBtn.addEventListener("click", function () {
+        goToScene(sceneState.current - 1);
+      });
+    }
+    if (nextBtn) {
+      nextBtn.addEventListener("click", function () {
+        goToScene(sceneState.current + 1);
+      });
+    }
+
+    // 桌面宽屏下滚轮升级为幕间非线性快切（内容超出单屏时自动放行幕内滚动，到边缘再切幕）
+    window.addEventListener(
+      "wheel",
+      function (e) {
+        if (reduceMotion) return;
+        if (window.innerWidth <= 960) return;
+        if (stageState.open) return; // 全屏项目档案打开时不拦截滚轮
+        if (e.ctrlKey || e.metaKey) return; // 不干扰页面缩放
+
+        var now = performance.now();
+        if (sceneState.animating || now < sceneState.lockUntil) {
+          e.preventDefault();
+          return;
+        }
+
+        if (Math.abs(e.deltaY) < 16) return;
+
+        var idx = detectClosestScene();
+        var sec = getSceneEl(idx);
+        if (!sec) return;
+
+        var dir = e.deltaY > 0 ? 1 : -1;
+        var viewTop = window.scrollY;
+        var viewBot = viewTop + window.innerHeight;
+        var secTop = sec.offsetTop;
+        var secBot = secTop + sec.offsetHeight;
+        // 最后一幕把页脚算进来
+        if (idx === sceneDefs.length - 1) {
+          secBot = document.documentElement.scrollHeight;
+        }
+
+        // 若该幕本身比视口更高，且还没滚到该幕边界，先放行原生滚动看全内容
+        if (dir > 0 && secBot > viewBot + 24) return;
+        if (dir < 0 && viewTop > secTop + 24) return;
+
+        var nextIdx = idx + dir;
+        if (nextIdx < 0 || nextIdx >= sceneDefs.length) return;
+
+        e.preventDefault();
+        goToScene(nextIdx);
+      },
+      { passive: false }
+    );
+
+    // 键盘方向键 / PageDown / PageUp 同样走非线性幕间快切
+    document.addEventListener("keydown", function (e) {
+      if (stageState.open) return;
+      if (e.target && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
+      if (e.key === "PageDown" || e.key === "ArrowDown") {
+        var cur = detectClosestScene();
+        if (cur < sceneDefs.length - 1) {
+          e.preventDefault();
+          goToScene(cur + 1);
+        }
+      } else if (e.key === "PageUp" || e.key === "ArrowUp") {
+        var curUp = detectClosestScene();
+        if (curUp > 0) {
+          e.preventDefault();
+          goToScene(curUp - 1);
+        }
+      }
+    });
+
+    // 手动拖滚动条时保持右下角 HUD 同步准确
+    window.addEventListener(
+      "scroll",
+      function () {
+        if (!sceneState.animating) {
+          var detected = detectClosestScene();
+          if (detected !== sceneState.current) syncSceneHUD(detected);
+        }
+      },
+      { passive: true }
+    );
+
+    syncSceneHUD(detectClosestScene());
   }
 
   // ---------- 启动 ----------
@@ -2112,6 +2354,7 @@
   initTearEdges();
   initDockAndMinimap();
   bindActions();
+  initCinematicScenes();
   initLunarCanvas();
   initBentoVisuals();
   initNebulaCanvas();
