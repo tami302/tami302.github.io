@@ -1,0 +1,1508 @@
+/* ============================================================
+   黑白交替 · ASCII 天体 · 复古终端 个人主页样式表（styles.css）
+   美学融合：
+   1. Maxim Kuznetsov Bento Card（纯黑白嵌套细描边 + 离散像素群 + 抖动点彩 + 双色文字）
+   2. The Content Architecture（暖纸米白 #F4F3EE ↔ 深炭黑 #0B0B0B 交替 + 字符碎片撕裂边界 + 悬浮菜单盒 + 打孔票据卡 + 同心文字星轨）
+   ============================================================ */
+
+:root {
+  --paper: #f4f3ee;
+  --paper-soft: #eae8e0;
+  --paper-line: rgba(17, 17, 17, 0.14);
+  --paper-line-strong: rgba(17, 17, 17, 0.28);
+
+  --void: #0b0b0b;
+  --charcoal: #141414;
+  --charcoal-up: #1c1c1c;
+  --dark-line: rgba(244, 243, 238, 0.14);
+  --dark-line-strong: rgba(244, 243, 238, 0.28);
+
+  --ink: #121212;
+  --ink-muted: #6c6a63;
+  --bright: #f7f6f2;
+  --bright-muted: #7e7d78;
+
+  --font-sans: "Inter", "Helvetica Neue", "Neue Haas Grotesk Display Pro",
+    "Segoe UI", Arial, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", "Cascadia Mono", "SFMono-Regular",
+    Consolas, ui-monospace, monospace;
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --container: 1200px;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+  font-size: 16px;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  background: var(--void);
+  color: var(--bright);
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+body.drawer-open {
+  overflow: hidden;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+:focus-visible {
+  outline: 1.5px solid currentColor;
+  outline-offset: 3px;
+}
+
+.container {
+  width: min(var(--container), calc(100% - 48px));
+  margin-inline: auto;
+}
+
+/* ---------- 通用黑白色带 ---------- */
+.band {
+  position: relative;
+  width: 100%;
+}
+
+.band--dark {
+  background: var(--void);
+  color: var(--bright);
+}
+
+.band--light {
+  background: var(--paper);
+  color: var(--ink);
+}
+
+.tone-bright {
+  color: var(--bright);
+}
+
+.tone-muted {
+  color: var(--bright-muted);
+}
+
+/* ============================================================
+   左上角复古点阵悬浮菜单盒（Floating Dock）
+   ============================================================ */
+.dock {
+  position: fixed;
+  top: 18px;
+  left: 18px;
+  z-index: 60;
+  width: 244px;
+}
+
+.dock__frame {
+  padding: 5px;
+  border-radius: 7px;
+  background-color: #161616;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.14) 0.75px, transparent 0.75px);
+  background-size: 4px 4px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.42);
+}
+
+.dock__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 7px 8px 7px 9px;
+  border-radius: 4px;
+  background: #1d1d1d;
+  color: var(--bright);
+}
+
+.dock__brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.hatch-logo {
+  width: 20px;
+  height: 20px;
+  border-radius: 2px;
+  display: inline-block;
+  background: repeating-linear-gradient(
+    -45deg,
+    #f4f3ee 0px,
+    #f4f3ee 1.5px,
+    #181818 1.5px,
+    #181818 3.5px
+  );
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.hatch-logo--dark {
+  background: repeating-linear-gradient(
+    -45deg,
+    #141414 0px,
+    #141414 1.5px,
+    #f4f3ee 1.5px,
+    #f4f3ee 3.5px
+  );
+  border: 1px solid rgba(17, 17, 17, 0.35);
+}
+
+.dock__toggle {
+  width: 24px;
+  height: 24px;
+  border-radius: 3px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: #282828;
+  color: var(--bright);
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
+  line-height: 1;
+  display: grid;
+  place-items: center;
+  transition: background-color 160ms ease, color 160ms ease;
+}
+
+.dock__toggle:hover {
+  background: var(--bright);
+  color: var(--void);
+}
+
+.dock__menu {
+  margin-top: 4px;
+  padding: 6px;
+  border-radius: 4px;
+  background: #141414;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.dock__menu[hidden] {
+  display: none;
+}
+
+.dock__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 7px 9px;
+  border-radius: 3px;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  color: rgba(244, 243, 238, 0.76);
+  transition: background-color 150ms ease, color 150ms ease;
+}
+
+.dock__item:hover {
+  background: var(--bright);
+  color: var(--void);
+}
+
+.dock__ticker {
+  margin-top: 4px;
+  overflow: hidden;
+  border-radius: 3px;
+  background: var(--paper);
+  color: var(--ink);
+  padding: 3px 0;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+}
+
+.dock__ticker-track {
+  display: inline-flex;
+  gap: 32px;
+  animation: tickerRun 22s linear infinite;
+}
+
+@keyframes tickerRun {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+/* ============================================================
+   右上角黑白全页 Minimap
+   ============================================================ */
+.minimap {
+  position: fixed;
+  top: 18px;
+  right: 18px;
+  z-index: 60;
+  width: 44px;
+  padding: 3px;
+  border-radius: 4px;
+  background: #181818;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.35);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.minimap__band {
+  display: block;
+  width: 100%;
+  height: 14px;
+  border: none;
+  padding: 0;
+  border-radius: 1px;
+  opacity: 0.85;
+  transition: opacity 150ms ease;
+}
+
+.minimap__band:hover {
+  opacity: 1;
+}
+
+.minimap__band--dark {
+  background: #0d0d0d;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+.minimap__band--light {
+  background: var(--paper);
+}
+
+.minimap__lens {
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  top: 3px;
+  height: 16px;
+  border: 1.5px solid #ffffff;
+  background: rgba(255, 255, 255, 0.14);
+  pointer-events: none;
+  mix-blend-mode: difference;
+  transition: top 70ms linear;
+}
+
+/* ============================================================
+   BAND 00 (DARK): 首屏 · 实时 ASCII 半弦月粒子消散
+   ============================================================ */
+.hero {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 104px 0 28px;
+  overflow: hidden;
+}
+
+.hero__canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  cursor: crosshair;
+}
+
+.hero__inner {
+  position: relative;
+  z-index: 2;
+  margin-block: auto;
+  pointer-events: none;
+}
+
+.hero__copy {
+  max-width: 640px;
+  pointer-events: auto;
+}
+
+.hero__kicker {
+  margin: 0 0 22px;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.12em;
+  color: var(--bright-muted);
+}
+
+.hero__title {
+  margin: 0 0 26px;
+  font-size: clamp(2.45rem, 5vw, 4.35rem);
+  font-weight: 600;
+  line-height: 1.08;
+  letter-spacing: -0.035em;
+}
+
+.hero__title span {
+  display: block;
+}
+
+.hero__bio {
+  margin: 0 0 38px;
+  font-size: 1rem;
+  line-height: 1.7;
+  color: #a4a39d;
+  max-width: 48ch;
+}
+
+.hero__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+
+/* 复古缺口双体票据按钮（致敬 GET | ACCESS） */
+.ticket-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  padding: 0;
+  border: none;
+  background: transparent;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  transition: transform 200ms var(--ease);
+}
+
+.ticket-btn:hover {
+  transform: translateY(-2px);
+}
+
+.ticket-btn__part {
+  padding: 12px 18px;
+  border-radius: 4px;
+  transition: background-color 180ms ease, color 180ms ease, border-color 180ms ease;
+}
+
+.ticket-btn__notch {
+  width: 3px;
+  height: 18px;
+  background: currentColor;
+  opacity: 0.25;
+}
+
+.ticket-btn--light .ticket-btn__part {
+  background: var(--paper);
+  color: var(--ink);
+}
+
+.ticket-btn--light .ticket-btn__notch {
+  background: var(--paper);
+  opacity: 0.85;
+}
+
+.ticket-btn--light:hover .ticket-btn__part {
+  background: #ffffff;
+}
+
+.ticket-btn--outline .ticket-btn__part {
+  background: rgba(18, 18, 18, 0.86);
+  color: var(--bright);
+  border: 1px solid var(--dark-line-strong);
+}
+
+.ticket-btn--outline .ticket-btn__notch {
+  width: 2px;
+  background: rgba(244, 243, 238, 0.35);
+}
+
+.ticket-btn--outline:hover .ticket-btn__part {
+  border-color: var(--bright);
+  background: #1f1f1f;
+}
+
+.hero__telemetry {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding-top: 18px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  color: var(--bright-muted);
+  pointer-events: none;
+}
+
+/* ============================================================
+   丝滑高密度黑白字符与像素溶解过渡带（Dithered ASCII Dissolve）
+   ============================================================ */
+.tear-edge {
+  position: relative;
+  width: 100%;
+  height: 132px;
+  overflow: hidden;
+  user-select: none;
+  margin-top: -1px;
+  margin-bottom: -1px;
+}
+
+.tear-edge__canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* ============================================================
+   BAND 01 (LIGHT 暖米白): Selected Works · Bento Dither 展板
+   ============================================================ */
+.works {
+  padding: 96px 0 112px;
+}
+
+.band-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 32px;
+  margin-bottom: 54px;
+}
+
+.mono-kicker {
+  margin: 0 0 12px;
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  letter-spacing: 0.12em;
+  color: var(--ink-muted);
+}
+
+.band-header--dark .mono-kicker {
+  color: var(--bright-muted);
+}
+
+.band-header h2 {
+  margin: 0 0 12px;
+  font-size: clamp(2.1rem, 4.2vw, 3.4rem);
+  font-weight: 600;
+  line-height: 1.08;
+  letter-spacing: -0.035em;
+}
+
+.band-header__sub {
+  margin: 0;
+  font-size: 0.98rem;
+  color: var(--ink-muted);
+  max-width: 52ch;
+}
+
+.giant-num {
+  font-family: var(--font-sans);
+  font-size: clamp(4.8rem, 9vw, 8.2rem);
+  font-weight: 700;
+  line-height: 0.82;
+  letter-spacing: -0.06em;
+  color: var(--ink);
+  opacity: 0.14;
+  user-select: none;
+}
+
+/* Maxim Kuznetsov 风格黑白 Bento 展板网格 */
+.bento-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 22px;
+}
+
+.bento-card {
+  position: relative;
+  display: block;
+  width: 100%;
+  min-height: 560px;
+  padding: 20px;
+  border-radius: 6px;
+  border: 1px solid rgba(17, 17, 17, 0.92);
+  background: #060606;
+  color: var(--bright);
+  text-align: left;
+  overflow: hidden;
+  transition: transform 320ms var(--ease), box-shadow 320ms ease;
+}
+
+.bento-card:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 28px 56px -24px rgba(0, 0, 0, 0.45);
+}
+
+/* 底层：离散白色像素点阵群 + 极淡工程虚线网格 */
+.bento-card__bg-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+/* 居中嵌套的 1px hairline 子画框（精准复刻参考 1，大幅视觉裁切视口） */
+.bento-card__inner {
+  position: relative;
+  z-index: 2;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 0;
+  background: rgba(7, 7, 7, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(2px);
+  transition: border-color 240ms ease, background-color 240ms ease;
+}
+
+.bento-card:hover .bento-card__inner {
+  border-color: rgba(255, 255, 255, 0.48);
+  background: rgba(9, 9, 9, 0.96);
+}
+
+/* 精致的 + 十字准星角落（参考 1 标志元素） */
+.crosshair {
+  position: absolute;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  line-height: 1;
+  color: rgba(255, 255, 255, 0.52);
+  pointer-events: none;
+  z-index: 4;
+  transition: transform 300ms var(--ease), color 220ms ease;
+}
+
+.crosshair--tl {
+  top: -6px;
+  left: -5px;
+}
+
+.crosshair--br {
+  bottom: -6px;
+  right: -5px;
+}
+
+.bento-card:hover .crosshair {
+  color: #ffffff;
+  transform: rotate(90deg);
+}
+
+.bento-card__top-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 13px 18px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  color: var(--bright-muted);
+}
+
+/* 大画幅局部特写微缩 ASCII 天体视口（满宽裁切，极具电影纵深感） */
+.bento-card__viewport {
+  position: relative;
+  width: 100%;
+  height: 274px;
+  overflow: hidden;
+  background: #040404;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.bento-card__motif {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.bento-card__copy {
+  padding: 20px 20px 18px;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  justify-content: space-between;
+}
+
+.bento-card__eyebrow {
+  margin: 0 0 8px;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.05em;
+  color: #8c8b85;
+}
+
+/* 双色调主句（前半亮白，后半暗灰，复刻参考 1） */
+.bento-card__statement {
+  margin: 0 0 18px;
+  font-size: 1.12rem;
+  font-weight: 500;
+  line-height: 1.34;
+  letter-spacing: -0.02em;
+}
+
+.bento-card__footer {
+  padding-top: 14px;
+  border-top: 1px dashed rgba(255, 255, 255, 0.16);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  color: rgba(244, 243, 238, 0.65);
+}
+
+.bento-card__open {
+  transition: transform 220ms var(--ease), color 180ms ease;
+}
+
+.bento-card:hover .bento-card__open {
+  color: #ffffff;
+  transform: translateX(4px);
+}
+
+/* ============================================================
+   BAND 02 (DARK): 全屏实时 ASCII 银河星云 + 终端点线清单
+   ============================================================ */
+.nebula {
+  padding: 112px 0 120px;
+  overflow: hidden;
+}
+
+.nebula__canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  opacity: 0.92;
+}
+
+.nebula__inner {
+  position: relative;
+  z-index: 2;
+}
+
+.mono-stamp {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.1em;
+  color: var(--bright-muted);
+  padding: 6px 10px;
+  border: 1px solid var(--dark-line);
+  background: rgba(11, 11, 11, 0.75);
+}
+
+/* 复古终端点线表（Dot-leader table，致敬参考 2） */
+.ledger {
+  border-top: 1px solid var(--dark-line-strong);
+  border-bottom: 1px solid var(--dark-line-strong);
+  background: rgba(10, 10, 10, 0.74);
+  backdrop-filter: blur(4px);
+  margin-bottom: 44px;
+}
+
+.ledger-row {
+  display: grid;
+  grid-template-columns: 74px 120px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px;
+  padding: 18px 20px;
+  border-bottom: 1px dashed rgba(244, 243, 238, 0.14);
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  transition: background-color 180ms ease, color 180ms ease;
+}
+
+.ledger-row:last-child {
+  border-bottom: none;
+}
+
+.ledger-row:hover {
+  background: var(--paper);
+  color: var(--ink);
+}
+
+.ledger-row__code {
+  color: var(--bright-muted);
+}
+
+.ledger-row__area {
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+
+.ledger-row__desc {
+  font-family: var(--font-sans);
+  font-size: 0.96rem;
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.ledger-row__dots {
+  flex: 1;
+  border-bottom: 1px dotted rgba(244, 243, 238, 0.25);
+  min-width: 24px;
+}
+
+.ledger-row:hover .ledger-row__code {
+  color: var(--ink-muted);
+}
+
+.ledger-row:hover .ledger-row__dots {
+  border-bottom-color: rgba(18, 18, 18, 0.3);
+}
+
+.ledger-row__state {
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  padding: 3px 8px;
+  border: 1px solid currentColor;
+}
+
+/* 极简黑白工具栈矩阵 */
+.stack-matrix {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.stack-col {
+  padding: 22px;
+  background: rgba(12, 12, 12, 0.8);
+  border: 1px solid var(--dark-line);
+  backdrop-filter: blur(4px);
+}
+
+.stack-col__title {
+  margin: 0 0 14px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--dark-line);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  color: var(--bright-muted);
+}
+
+.stack-col__items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.stack-tag {
+  font-family: var(--font-mono);
+  font-size: 0.76rem;
+  padding: 4px 9px;
+  border: 1px solid var(--dark-line-strong);
+  color: var(--bright);
+  transition: background-color 150ms ease, color 150ms ease;
+}
+
+.stack-tag:hover {
+  background: var(--paper);
+  color: var(--ink);
+}
+
+/* ============================================================
+   BAND 03 (LIGHT 暖米白): 同心文字星轨 + 复古打孔票据联系卡
+   ============================================================ */
+.contact {
+  padding: 104px 0 96px;
+}
+
+.contact__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(340px, 460px);
+  gap: 64px;
+  align-items: center;
+}
+
+.contact__left h2 {
+  margin: 0 0 26px;
+  font-size: clamp(2.4rem, 4.6vw, 3.8rem);
+  font-weight: 600;
+  line-height: 1.04;
+  letter-spacing: -0.04em;
+}
+
+.about-copy p {
+  margin: 0 0 16px;
+  font-size: 1rem;
+  line-height: 1.75;
+  color: #41403b;
+  max-width: 48ch;
+}
+
+.about-copy p:last-child {
+  margin-bottom: 0;
+}
+
+/* 同心圆轨道文字（致敬 The Content Architecture） */
+.orbit-emblem {
+  margin-top: 34px;
+  width: 220px;
+  height: 220px;
+}
+
+.orbit-svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.orbit-ring {
+  fill: none;
+  stroke: rgba(18, 18, 18, 0.14);
+  stroke-width: 1;
+}
+
+.orbit-ring--dash {
+  stroke-dasharray: 2 5;
+}
+
+.orbit-text {
+  fill: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 8.6px;
+  letter-spacing: 0.2em;
+}
+
+.orbit-text--sm {
+  font-size: 7.4px;
+  fill: var(--ink-muted);
+}
+
+.orbit-core {
+  fill: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 14px;
+}
+
+.orbit-spin {
+  transform-origin: 130px 130px;
+}
+
+.orbit-spin--cw {
+  animation: spinCW 42s linear infinite;
+}
+
+.orbit-spin--ccw {
+  animation: spinCCW 30s linear infinite;
+}
+
+@keyframes spinCW {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes spinCCW {
+  to {
+    transform: rotate(-360deg);
+  }
+}
+
+/* 复古打孔票据联系卡（Notched Receipt Card，致敬参考 2 定价卡） */
+.receipt {
+  border-radius: 8px;
+  background: var(--charcoal);
+  color: var(--bright);
+  box-shadow: 0 28px 60px -24px rgba(0, 0, 0, 0.36);
+  overflow: hidden;
+}
+
+.receipt__top {
+  padding: 32px 30px 26px;
+}
+
+.receipt__meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.1em;
+  color: var(--bright-muted);
+  margin-bottom: 26px;
+}
+
+.receipt__big {
+  font-size: clamp(3.6rem, 6vw, 5.2rem);
+  font-weight: 700;
+  line-height: 0.9;
+  letter-spacing: -0.05em;
+  margin-bottom: 14px;
+}
+
+.receipt__sub {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  letter-spacing: 0.08em;
+  color: var(--bright-muted);
+}
+
+/* 左右半圆缺口 + 水平虚线 */
+.receipt__perforation {
+  position: relative;
+  height: 24px;
+  display: flex;
+  align-items: center;
+}
+
+.perforation-line {
+  width: 100%;
+  border-top: 1px dashed rgba(244, 243, 238, 0.24);
+}
+
+.notch {
+  position: absolute;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--paper);
+}
+
+.notch--left {
+  left: -12px;
+}
+
+.notch--right {
+  right: -12px;
+}
+
+.receipt__bottom {
+  padding: 10px 30px 26px;
+}
+
+.receipt__row {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 15px 0;
+  border-bottom: 1px solid rgba(244, 243, 238, 0.1);
+  font-family: var(--font-mono);
+  font-size: 0.76rem;
+}
+
+.receipt__row:last-child {
+  border-bottom: none;
+}
+
+.receipt__label {
+  color: var(--bright-muted);
+  letter-spacing: 0.06em;
+}
+
+.receipt__val {
+  color: var(--bright);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.receipt__row--link:hover .receipt__val {
+  text-decoration: underline;
+}
+
+.receipt__btn {
+  padding: 5px 10px;
+  border-radius: 3px;
+  border: 1px solid rgba(244, 243, 238, 0.35);
+  background: transparent;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  transition: background-color 160ms ease, color 160ms ease;
+}
+
+.receipt__btn:hover {
+  background: var(--paper);
+  color: var(--ink);
+}
+
+.receipt__arrow,
+.receipt__dot {
+  color: var(--bright-muted);
+}
+
+/* ---------- 页脚 ---------- */
+.footer {
+  background: var(--paper);
+  color: var(--ink);
+  border-top: 1px solid var(--paper-line);
+  padding: 26px 0 34px;
+}
+
+.footer__inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  color: var(--ink-muted);
+}
+
+.footer__brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.footer__top {
+  border: none;
+  background: transparent;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  color: var(--ink);
+}
+
+.footer__top:hover {
+  text-decoration: underline;
+}
+
+/* ============================================================
+   全屏沉浸式项目展台（FLIP 放大左移 + 右侧终端逐行打字）
+   ============================================================ */
+.stage {
+  position: fixed;
+  inset: 0;
+  z-index: 85;
+  display: flex;
+  flex-direction: column;
+  color: var(--bright);
+}
+
+.stage[hidden] {
+  display: none;
+}
+
+.stage__backdrop {
+  position: absolute;
+  inset: 0;
+  background-color: rgba(7, 7, 7, 0.96);
+  background-image:
+    linear-gradient(to right, rgba(244, 243, 238, 0.035) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(244, 243, 238, 0.035) 1px, transparent 1px);
+  background-size: 36px 36px;
+  opacity: 0;
+  transition: opacity 380ms var(--ease);
+}
+
+.stage.is-open .stage__backdrop {
+  opacity: 1;
+}
+
+.stage__shell {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  width: min(1320px, 100%);
+  height: 100%;
+  margin-inline: auto;
+  padding: 22px 34px 28px;
+}
+
+.stage__topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--dark-line);
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  letter-spacing: 0.1em;
+  opacity: 0;
+  transform: translateY(-8px);
+  transition: opacity 320ms ease 120ms, transform 360ms var(--ease) 120ms;
+}
+
+.stage.is-open .stage__topbar {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.stage__id {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--bright-muted);
+}
+
+.stage__dot {
+  width: 7px;
+  height: 7px;
+  background: var(--bright);
+  display: inline-block;
+}
+
+.stage__controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.stage__nav-btn,
+.stage__close {
+  padding: 6px 11px;
+  border: 1px solid var(--dark-line-strong);
+  background: rgba(14, 14, 14, 0.9);
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  color: var(--bright);
+  transition: background-color 150ms ease, color 150ms ease, border-color 150ms ease;
+}
+
+.stage__nav-btn:hover,
+.stage__close:hover {
+  background: var(--paper);
+  color: var(--ink);
+  border-color: var(--paper);
+}
+
+.stage__grid {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1.04fr) minmax(0, 0.96fr);
+  gap: 44px;
+  align-items: center;
+  padding-top: 24px;
+}
+
+/* 左侧：大画幅实时 3D ASCII 天体视口（由原卡片 FLIP 缩放放大平滑飞入） */
+.stage__visual-wrap {
+  position: relative;
+  width: 100%;
+  height: min(640px, calc(100vh - 128px));
+  background: #040404;
+  border: 1px solid rgba(244, 243, 238, 0.24);
+  transform-origin: top left;
+  will-change: transform;
+  cursor: crosshair;
+}
+
+.stage__canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* 右侧：闪出并逐行打字呈现的终端档案 */
+.stage__dossier {
+  height: min(640px, calc(100vh - 128px));
+  overflow-y: auto;
+  padding-right: 12px;
+  opacity: 0;
+  transform: translateX(18px);
+  transition: opacity 260ms ease 140ms, transform 380ms var(--ease) 140ms;
+}
+
+.stage.is-open .stage__dossier {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.stage__dossier::-webkit-scrollbar {
+  width: 4px;
+}
+
+.stage__dossier::-webkit-scrollbar-thumb {
+  background: rgba(244, 243, 238, 0.22);
+}
+
+.stage__eyebrow {
+  margin: 0 0 10px;
+  min-height: 1.2em;
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  letter-spacing: 0.12em;
+  color: var(--bright-muted);
+}
+
+.stage__title {
+  margin: 0 0 24px;
+  min-height: 2.3em;
+  font-size: clamp(1.45rem, 2.2vw, 1.95rem);
+  font-weight: 600;
+  line-height: 1.22;
+  letter-spacing: -0.025em;
+  color: var(--bright);
+}
+
+.stage__specs {
+  margin: 0 0 24px;
+  border: 1px solid var(--dark-line);
+  background: rgba(18, 18, 18, 0.8);
+}
+
+.stage-spec {
+  display: grid;
+  grid-template-columns: 104px minmax(0, 1fr);
+  gap: 12px;
+  padding: 10px 14px;
+  border-bottom: 1px dashed rgba(244, 243, 238, 0.12);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  opacity: 0;
+  transition: opacity 140ms ease;
+}
+
+.stage-spec.is-shown {
+  opacity: 1;
+}
+
+.stage-spec:last-child {
+  border-bottom: none;
+}
+
+.stage-spec dt {
+  color: var(--bright-muted);
+}
+
+.stage-spec dd {
+  margin: 0;
+  color: var(--bright);
+}
+
+.stage__section {
+  margin-bottom: 22px;
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity 180ms ease, transform 240ms var(--ease);
+}
+
+.stage__section.is-shown {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.stage__section h4 {
+  margin: 0 0 9px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--dark-line);
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.12em;
+  color: var(--bright-muted);
+}
+
+.stage__section p {
+  margin: 0;
+  font-size: 0.92rem;
+  line-height: 1.72;
+  color: #d4d3cd;
+}
+
+.stage__list {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 0.9rem;
+  line-height: 1.64;
+  color: #d4d3cd;
+}
+
+.stage__tags {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.stage__tags li {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  padding: 4px 10px;
+  border: 1px solid var(--dark-line-strong);
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity 140ms ease, transform 180ms var(--ease);
+}
+
+.stage__tags li.is-shown {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* 正在打字的终端方块光标 */
+.is-typing::after {
+  content: "█";
+  display: inline-block;
+  margin-left: 3px;
+  color: var(--bright);
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+  animation: blinkCursor 540ms steps(2, start) infinite;
+}
+
+@keyframes blinkCursor {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+}
+
+@media (max-width: 960px) {
+  .stage__shell {
+    padding: 16px 18px 22px;
+    overflow-y: auto;
+  }
+
+  .stage__grid {
+    grid-template-columns: 1fr;
+    gap: 24px;
+    align-items: start;
+  }
+
+  .stage__visual-wrap {
+    height: 320px;
+  }
+
+  .stage__dossier {
+    height: auto;
+    overflow: visible;
+    padding-right: 0;
+  }
+}
+
+/* ---------- Toast ---------- */
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 26px;
+  transform: translate(-50%, 16px);
+  padding: 10px 18px;
+  border-radius: 3px;
+  background: var(--paper);
+  color: var(--ink);
+  border: 1px solid var(--ink);
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  letter-spacing: 0.08em;
+  opacity: 0;
+  pointer-events: none;
+  z-index: 95;
+  transition: opacity 200ms ease, transform 240ms var(--ease);
+}
+
+.toast.is-visible {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+/* ============================================================
+   响应式适配
+   ============================================================ */
+@media (max-width: 1040px) {
+  .bento-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .bento-card {
+    min-height: 430px;
+  }
+
+  .contact__grid,
+  .stack-matrix {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 760px) {
+  .container {
+    width: calc(100% - 28px);
+  }
+
+  .dock {
+    top: 12px;
+    left: 12px;
+    width: 210px;
+  }
+
+  .minimap {
+    display: none;
+  }
+
+  .hero {
+    padding-top: 112px;
+  }
+
+  .hero__telemetry {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+
+  .band-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .giant-num {
+    display: none;
+  }
+
+  .ledger-row {
+    grid-template-columns: 60px minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  .ledger-row__desc {
+    grid-column: 1 / -1;
+  }
+
+  .ledger-row__dots {
+    display: none;
+  }
+
+  .footer__inner {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  .dock__ticker-track,
+  .orbit-spin {
+    animation: none !important;
+  }
+}

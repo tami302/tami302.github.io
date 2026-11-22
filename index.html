@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="TIM — Engineering portfolio, autonomous agents, and ASCII celestial experiments." />
+  <title>TIM — Systems in the Quiet</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <!-- ========================================================
+       左上角复古点阵悬浮菜单盒（The Content Architecture 风格）
+       ======================================================== -->
+  <aside class="dock" id="nav-dock" aria-label="Primary navigation">
+    <div class="dock__frame">
+      <div class="dock__bar">
+        <a class="dock__brand" href="#lunar" aria-label="Back to top">
+          <span class="hatch-logo" aria-hidden="true"></span>
+          <span class="dock__handle" id="dock-handle">TIM</span>
+        </a>
+        <button
+          type="button"
+          class="dock__toggle"
+          id="dock-toggle"
+          aria-expanded="false"
+          aria-controls="dock-menu"
+          aria-label="Toggle navigation menu"
+        >+</button>
+      </div>
+
+      <nav class="dock__menu" id="dock-menu" hidden>
+        <a class="dock__item" href="#lunar"><span>00</span><span>LUNAR</span></a>
+        <a class="dock__item" href="#works"><span>01</span><span>WORKS</span></a>
+        <a class="dock__item" href="#nebula"><span>02</span><span>NEBULA / NOW</span></a>
+        <a class="dock__item" href="#contact"><span>03</span><span>CONTACT</span></a>
+      </nav>
+
+      <div class="dock__ticker" aria-hidden="true">
+        <div class="dock__ticker-track" id="dock-ticker">
+          <span>SHANGHAI · TONGJI UNIVERSITY · ENGINEERING · BUILDING SYSTEMS IN THE QUIET</span>
+          <span>SHANGHAI · TONGJI UNIVERSITY · ENGINEERING · BUILDING SYSTEMS IN THE QUIET</span>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ========================================================
+       右上角全页黑白色带缩略图（Minimap）
+       ======================================================== -->
+  <aside class="minimap" id="minimap" aria-label="Page section minimap">
+    <button type="button" class="minimap__band minimap__band--dark" data-jump="#lunar" title="00 Lunar"></button>
+    <button type="button" class="minimap__band minimap__band--light" data-jump="#works" title="01 Works"></button>
+    <button type="button" class="minimap__band minimap__band--dark" data-jump="#nebula" title="02 Nebula & Now"></button>
+    <button type="button" class="minimap__band minimap__band--light" data-jump="#contact" title="03 Contact"></button>
+    <div class="minimap__lens" id="minimap-lens" aria-hidden="true"></div>
+  </aside>
+
+  <main>
+    <!-- ========================================================
+         BAND 00 (DARK): 实时 ASCII 半弦月粒子消散首屏
+         ======================================================== -->
+    <section id="lunar" class="band band--dark hero">
+      <!-- 实时高分屏 ASCII 半弦月 + 粒子风化消散 Canvas -->
+      <canvas id="moon-canvas" class="hero__canvas" aria-hidden="true"></canvas>
+
+      <div class="container hero__inner">
+        <div class="hero__copy">
+          <p class="hero__kicker" id="hero-kicker">SHANGHAI · 31.28°N 121.50°E · TONGJI B.ENG '30</p>
+
+          <h1 class="hero__title">
+            <span class="tone-bright" id="hero-lead">Building systems that run in the quiet,</span>
+            <span class="tone-muted" id="hero-rest">from autonomous agents to procedural visuals.</span>
+          </h1>
+
+          <p class="hero__bio" id="hero-bio"></p>
+
+          <div class="hero__actions">
+            <!-- 复古打孔双体按钮 -->
+            <a class="ticket-btn ticket-btn--light" href="#works">
+              <span class="ticket-btn__part">VIEW</span>
+              <span class="ticket-btn__notch" aria-hidden="true"></span>
+              <span class="ticket-btn__part">WORKS</span>
+            </a>
+
+            <button type="button" class="ticket-btn ticket-btn--outline" id="hero-copy-email">
+              <span class="ticket-btn__part">COPY</span>
+              <span class="ticket-btn__notch" aria-hidden="true"></span>
+              <span class="ticket-btn__part">EMAIL</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 首屏底栏极简天文读数 -->
+      <div class="container hero__telemetry">
+        <span id="moon-telemetry">LUNAR PHASE 0.44 · FIRST QUARTER DISSOLUTION</span>
+        <span class="telemetry-hint">MOVE CURSOR FOR SOLAR WIND · CLICK &amp; HOLD TO DISPERSE</span>
+      </div>
+    </section>
+
+    <!-- 丝滑高密度字符与像素溶解过渡带：DARK → LIGHT -->
+    <div class="tear-edge" data-tear="d2l" aria-hidden="true">
+      <canvas class="tear-edge__canvas"></canvas>
+    </div>
+
+    <!-- ========================================================
+         BAND 01 (LIGHT 暖米白): Selected Works · Bento Dither 展厅
+         ======================================================== -->
+    <section id="works" class="band band--light works">
+      <div class="container">
+        <header class="band-header">
+          <div class="band-header__left">
+            <p class="mono-kicker">01 / SELECTED ARCHIVE</p>
+            <h2>Things built &amp; shipped.</h2>
+            <p class="band-header__sub">
+              Real systems tested against real constraints—click any plate to open the full technical dossier.
+            </p>
+          </div>
+          <div class="giant-num" id="works-count" aria-hidden="true">03</div>
+        </header>
+
+        <!-- Maxim Kuznetsov 风格黑白 Bento Dither 展板网格 -->
+        <div class="bento-grid" id="works-grid" role="list"></div>
+      </div>
+    </section>
+
+    <!-- 丝滑高密度字符与像素溶解过渡带：LIGHT → DARK -->
+    <div class="tear-edge" data-tear="l2d" aria-hidden="true">
+      <canvas class="tear-edge__canvas"></canvas>
+    </div>
+
+    <!-- ========================================================
+         BAND 02 (DARK): 全屏实时 ASCII 银河星云 + 终端点线表 Now & Stack
+         ======================================================== -->
+    <section id="nebula" class="band band--dark nebula">
+      <!-- 满屏实时流动的 ASCII 银河星云 Canvas -->
+      <canvas id="nebula-canvas" class="nebula__canvas" aria-hidden="true"></canvas>
+
+      <div class="container nebula__inner">
+        <header class="band-header band-header--dark">
+          <div class="band-header__left">
+            <p class="mono-kicker">02 / DEEP FIELD · CURRENT ORBIT</p>
+            <h2>
+              <span class="tone-bright">Currently in motion,</span>
+              <span class="tone-muted">iterating across web, agents, and systems.</span>
+            </h2>
+          </div>
+          <span class="mono-stamp" id="nebula-coords">NEBULA DENSITY · LIVE ASCII</span>
+        </header>
+
+        <!-- 复古终端点线清单（Dot-leader table） -->
+        <div class="ledger" id="now-ledger"></div>
+
+        <!-- 极简黑白工具矩阵 -->
+        <div class="stack-matrix" id="stack-matrix"></div>
+      </div>
+    </section>
+
+    <!-- 丝滑高密度字符与像素溶解过渡带：DARK → LIGHT -->
+    <div class="tear-edge" data-tear="d2l-2" aria-hidden="true">
+      <canvas class="tear-edge__canvas"></canvas>
+    </div>
+
+    <!-- ========================================================
+         BAND 03 (LIGHT 暖米白): 同心文字星轨 + 复古打孔票据联系卡
+         ======================================================== -->
+    <section id="contact" class="band band--light contact">
+      <div class="container contact__grid">
+        <div class="contact__left">
+          <p class="mono-kicker">03 / ABOUT &amp; SIGNAL</p>
+          <h2>Quiet craft.<br />Loud results.</h2>
+          <div class="about-copy" id="about-copy"></div>
+
+          <!-- 同心圆轨道文字装置（致敬 The Content Architecture） -->
+          <div class="orbit-emblem" aria-hidden="true">
+            <svg viewBox="0 0 260 260" class="orbit-svg">
+              <defs>
+                <path id="orbitOuter" d="M 130, 130 m -104, 0 a 104,104 0 1,1 208,0 a 104,104 0 1,1 -208,0" />
+                <path id="orbitInner" d="M 130, 130 m -70, 0 a 70,70 0 1,1 140,0 a 70,70 0 1,1 -140,0" />
+              </defs>
+              <circle cx="130" cy="130" r="118" class="orbit-ring" />
+              <circle cx="130" cy="130" r="88" class="orbit-ring orbit-ring--dash" />
+              <circle cx="130" cy="130" r="52" class="orbit-ring" />
+              <g class="orbit-spin orbit-spin--cw">
+                <text class="orbit-text">
+                  <textPath href="#orbitOuter">TIM · TONGJI ENGINEERING · SHANGHAI · AUTONOMOUS SYSTEMS · ASCII GRAPHICS · </textPath>
+                </text>
+              </g>
+              <g class="orbit-spin orbit-spin--ccw">
+                <text class="orbit-text orbit-text--sm">
+                  <textPath href="#orbitInner">31.28°N 121.50°E · PAPER &amp; INK · ZERO NOISE · </textPath>
+                </text>
+              </g>
+              <text x="130" y="134" text-anchor="middle" class="orbit-core">+</text>
+            </svg>
+          </div>
+        </div>
+
+        <!-- 右侧：复古打孔票据联系卡（Notched Receipt Card） -->
+        <aside class="receipt" aria-label="Contact ticket">
+          <div class="receipt__top">
+            <div class="receipt__meta">
+              <span>ADMIT ONE / DIRECT LINE</span>
+              <span id="receipt-school">TONGJI B.ENG '30</span>
+            </div>
+            <div class="receipt__big" id="receipt-handle">TIM</div>
+            <p class="receipt__sub" id="receipt-coords">SHANGHAI, CN · 31.28°N 121.50°E</p>
+          </div>
+
+          <!-- 左右半圆撕票缺口 + 水平虚线 -->
+          <div class="receipt__perforation" aria-hidden="true">
+            <span class="notch notch--left"></span>
+            <span class="perforation-line"></span>
+            <span class="notch notch--right"></span>
+          </div>
+
+          <div class="receipt__bottom">
+            <div class="receipt__row">
+              <span class="receipt__label">01 / EMAIL</span>
+              <span class="receipt__val" id="contact-email">your-email@example.com</span>
+              <button type="button" class="receipt__btn" id="copy-email-btn">COPY</button>
+            </div>
+
+            <a
+              class="receipt__row receipt__row--link"
+              id="contact-github"
+              href="https://github.com/your-handle"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <span class="receipt__label">02 / GITHUB</span>
+              <span class="receipt__val" id="contact-github-label">github.com/your-handle</span>
+              <span class="receipt__arrow" aria-hidden="true">↗</span>
+            </a>
+
+            <div class="receipt__row">
+              <span class="receipt__label">03 / MODE</span>
+              <span class="receipt__val">OPEN TO SHARP IDEAS</span>
+              <span class="receipt__dot" aria-hidden="true">■</span>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </section>
+  </main>
+
+  <!-- 极简暖米白页脚 -->
+  <footer class="footer">
+    <div class="container footer__inner">
+      <div class="footer__brand">
+        <span class="hatch-logo hatch-logo--dark" aria-hidden="true"></span>
+        <span id="footer-copy">© 2026 TIM · BUILT IN VANILLA HTML / CSS / CANVAS</span>
+      </div>
+      <button type="button" class="footer__top" id="back-to-top">RETURN TO LUNAR ↑</button>
+    </div>
+  </footer>
+
+  <!-- 全屏沉浸式项目展台：左侧 3D 天体放大视口 + 右侧终端逐行打字档案 -->
+  <div
+    class="stage"
+    id="dossier-stage"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="stage-title"
+    aria-hidden="true"
+    hidden
+  >
+    <div class="stage__backdrop" id="stage-backdrop"></div>
+
+    <div class="stage__shell">
+      <header class="stage__topbar">
+        <div class="stage__id">
+          <span class="stage__dot" aria-hidden="true"></span>
+          <span id="stage-code">001 · 2026</span>
+          <span>/</span>
+          <span id="stage-status">DEPLOYED</span>
+        </div>
+
+        <div class="stage__controls">
+          <button type="button" class="stage__nav-btn" id="stage-prev" aria-label="Previous project">← PREV</button>
+          <button type="button" class="stage__nav-btn" id="stage-next" aria-label="Next project">NEXT →</button>
+          <button type="button" class="stage__close" id="stage-close" aria-label="Close dossier">CLOSE [ESC]</button>
+        </div>
+      </header>
+
+      <div class="stage__grid">
+        <!-- 左侧：从原卡片 FLIP 缩放放大飞入的大画幅实时 3D ASCII 天体视口 -->
+        <div class="stage__visual-wrap" id="stage-visual-wrap">
+          <span class="crosshair crosshair--tl" aria-hidden="true">+</span>
+          <span class="crosshair crosshair--br" aria-hidden="true">+</span>
+          <canvas id="stage-canvas" class="stage__canvas" aria-label="Interactive 3D ASCII celestial viewport"></canvas>
+        </div>
+
+        <!-- 右侧：闪出并逐行打字呈现的终端项目档案 -->
+        <div class="stage__dossier" id="stage-dossier" title="Click during typing to reveal all">
+          <p class="stage__eyebrow" id="stage-eyebrow"></p>
+          <h3 class="stage__title" id="stage-title"></h3>
+
+          <dl class="stage__specs" id="stage-specs"></dl>
+
+          <div class="stage__section" id="stage-sec-problem">
+            <h4>01 / PROBLEM</h4>
+            <p id="stage-problem"></p>
+          </div>
+
+          <div class="stage__section" id="stage-sec-arch">
+            <h4>02 / ARCHITECTURE</h4>
+            <ol class="stage__list" id="stage-arch"></ol>
+          </div>
+
+          <div class="stage__section" id="stage-sec-outcome">
+            <h4>03 / OUTCOME</h4>
+            <p id="stage-outcome"></p>
+          </div>
+
+          <div class="stage__section" id="stage-sec-stack">
+            <h4>04 / STACK</h4>
+            <ul class="stage__tags" id="stage-stack"></ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 黑白极简 Toast -->
+  <div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
+
+  <script src="./data.js"></script>
+  <script src="./moon-ascii.js"></script>
+  <script src="./app.js"></script>
+</body>
+</html>
