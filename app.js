@@ -257,24 +257,63 @@
   }
 
   // ============================================================
-  // 4. 首屏照片级真月球 ASCII 半弦月（由天文实拍级照片量化生成）
-  //    + 右缘实时风化粒子消散（离屏预渲染缓存，稳锁 60fps）
+  // 4. 首屏真照片级 3D 球面天平动（Libration）ASCII 半弦月
+  //    将天文实拍级半弦月 144x144 纹理包覆到真 3D 球面上：
+  //    鼠标移动驱动 ±22° 真实球面 3D 旋转（含双线性采样与无穿帮边缘暗化），
+  //    同时叠加右缘 560 颗实时风化粒子消散与深空星尘三维视差。
   // ============================================================
   function initLunarCanvas() {
     var canvas = $("moon-canvas");
     var section = $("lunar");
     var telemetryEl = $("moon-telemetry");
-    var moonData = window.MOON_ASCII_DATA;
-    if (!canvas || !section || !moonData) return;
+    var texData = window.MOON_SPHERE_TEX;
+    if (!canvas || !section || !texData) return;
 
     var ctx = canvas.getContext("2d");
     if (!ctx) return;
+
+    // 解码 144x144 RLE 压缩球面纹理为极速 Float32Array 查找表
+    var texSize = texData.size;
+    var texBuf = new Float32Array(texSize * texSize);
+    (function decodeRLE() {
+      var rle = texData.rle;
+      var out = 0;
+      var len = rle.length;
+      for (var i = 0; i < len && out < texBuf.length; i++) {
+        var c = rle[i];
+        if (c === "~") {
+          var semi = rle.indexOf(";", i + 1);
+          var count = parseInt(rle.slice(i + 1, semi), 10);
+          out += count;
+          i = semi;
+        } else {
+          texBuf[out++] = parseInt(c, 36) / 35;
+        }
+      }
+    })();
+
+    // 双线性插值采样 144x144 月球照片纹理（转动丝滑无闪烁）
+    function sampleMoonTex(u, v) {
+      var fx = (u * 0.5 + 0.5) * (texSize - 1);
+      var fy = (v * 0.5 + 0.5) * (texSize - 1);
+      if (fx < 0 || fx >= texSize - 1 || fy < 0 || fy >= texSize - 1) return 0;
+      var ix = fx | 0;
+      var iy = fy | 0;
+      var tx = fx - ix;
+      var ty = fy - iy;
+      var row0 = iy * texSize + ix;
+      var row1 = row0 + texSize;
+      var a = texBuf[row0] + (texBuf[row0 + 1] - texBuf[row0]) * tx;
+      var b = texBuf[row1] + (texBuf[row1 + 1] - texBuf[row1]) * tx;
+      return a + (b - a) * ty;
+    }
 
     var dpr = Math.min(window.devicePixelRatio || 1, 2);
     var width = 0;
     var height = 0;
     var moonBuffer = document.createElement("canvas");
-    var edgeEmitters = []; // 从真实月球最右缘与晨昏线尖角收集的粒子发射源
+    var moonGeom = { cx: 0, cy: 0, R: 0 };
+    var edgeEmitters = [];
 
     var stars = [];
     var particles = [];
@@ -282,74 +321,95 @@
     var pointer = { active: false, x: 0, y: 0, down: false };
     var disperseBoost = 0;
 
-    // 一次性离屏绘制真实月球照片级 ASCII 矩阵
-    function bakeMoonBuffer() {
-      moonBuffer.width = Math.floor(width * dpr);
-      moonBuffer.height = Math.floor(height * dpr);
+    // 3D 球面天平动（Libration）姿态角（阻尼跟随鼠标，范围锁定 ±22° 防背面穿帮）
+    var yaw = 0;
+    var pitch = 0;
+    var targetYaw = 0;
+    var targetPitch = 0;
+
+    // 按当前 3D (yaw, pitch) 角度重绘离屏高精度 ASCII 半弦月球体
+    function bakeMoonSphere(curYaw, curPitch) {
+      if (
+        moonBuffer.width !== Math.floor(width * dpr) ||
+        moonBuffer.height !== Math.floor(height * dpr)
+      ) {
+        moonBuffer.width = Math.floor(width * dpr);
+        moonBuffer.height = Math.floor(height * dpr);
+      }
       var bctx = moonBuffer.getContext("2d");
       bctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       bctx.clearRect(0, 0, width, height);
 
-      var cols = moonData.cols;
-      var rows = moonData.rows;
-      var isNarrow = width < 860;
+      var cx = moonGeom.cx;
+      var cy = moonGeom.cy;
+      var R = moonGeom.R;
+      var cellW = 4.6;
+      var cellH = 6.4;
 
-      // 严格按字符宽高比等比缩放，保证月球圆弧 100% 真实不畸变
-      var targetH = isNarrow
-        ? Math.min(height * 0.48, 360)
-        : Math.min(height * 0.78, 610);
-      var cellH = targetH / rows;
-      var cellW = cellH * moonData.cellAspect;
-      var totalW = cols * cellW;
-      var totalH = rows * cellH;
-
-      var originX = isNarrow
-        ? Math.max(width * 0.42, width * 0.9 - totalW)
-        : Math.max(width * 0.49, width * 0.87 - totalW);
-      var originY = isNarrow ? height * 0.08 : (height - totalH) * 0.48;
-
-      var fontPx = Math.max(5.2, cellH * 1.04);
-      bctx.font = fontPx.toFixed(1) + 'px "JetBrains Mono", "Cascadia Mono", Consolas, monospace';
+      bctx.font = '6.4px "JetBrains Mono", "Cascadia Mono", Consolas, monospace';
       bctx.textBaseline = "middle";
       bctx.textAlign = "center";
 
+      // 逆旋转矩阵系数：将观察空间球面点 (sx, sy, sz) 逆转回原正交月球照片坐标系
+      var cyw = Math.cos(-curYaw);
+      var syw = Math.sin(-curYaw);
+      var cpt = Math.cos(-curPitch);
+      var spt = Math.sin(-curPitch);
+
+      var y0 = Math.max(0, Math.floor((cy - R) / cellH) * cellH);
+      var y1 = Math.min(height, cy + R);
+      var x0 = Math.max(0, Math.floor((cx - R) / cellW) * cellW);
+      var x1 = Math.min(width, cx + R);
+
       edgeEmitters = [];
 
-      for (var r = 0; r < rows; r++) {
-        var cRow = moonData.chars[r];
-        var lRow = moonData.lum[r];
+      for (var y = y0; y <= y1; y += cellH) {
+        var sy = (y - cy) / R;
+        var sy2 = sy * sy;
+        if (sy2 >= 1.0) continue;
+        var maxSx = Math.sqrt(1.0 - sy2);
+        var rowMinX = Math.max(x0, Math.floor((cx - maxSx * R) / cellW) * cellW);
+        var rowMaxX = Math.min(x1, cx + maxSx * R);
 
-        // 先定位本行月面最右端非空列，用于做极其克制的右缘粒子风化
-        var rightEdge = -1;
-        for (var scan = cols - 1; scan >= 0; scan--) {
-          if (cRow[scan] !== " ") {
-            rightEdge = scan;
-            break;
+        for (var x = rowMinX; x <= rowMaxX; x += cellW) {
+          var sx = (x - cx) / R;
+          var r2 = sx * sx + sy2;
+          if (r2 >= 1.0) continue;
+
+          var sz = Math.sqrt(1.0 - r2);
+
+          // 先绕 X 轴逆转 -pitch，再绕 Y 轴逆转 -yaw
+          var y1r = sy * cpt - sz * spt;
+          var z1r = sy * spt + sz * cpt;
+          var px0 = sx * cyw + z1r * syw;
+          var pz0 = -sx * syw + z1r * cyw;
+
+          // 背面防穿帮：转到原图正面可见半球之外时自然融入深空阴影
+          if (pz0 <= 0.03) continue;
+
+          var lum = sampleMoonTex(px0, y1r);
+          if (lum < 0.04) continue;
+
+          // 极边缘临边立体暗化，强化真实 3D 球面转角感
+          if (pz0 < 0.28) {
+            lum *= pz0 / 0.28;
           }
-        }
-        if (rightEdge < 0) continue;
 
-        for (var c = 0; c < cols; c++) {
-          var ch = cRow[c];
+          // 仅在当前屏幕最右侧亮弧边缘施加克制粒子风化剥蚀，并更新粒子发射器坐标
+          var edgeDist = maxSx - sx;
+          if (sx > 0.28 && edgeDist < 0.14) {
+            edgeEmitters.push({ x: x, y: y, lum: lum });
+            var eFrac = 1 - edgeDist / 0.14;
+            var erodeN = fbm(px0 * 7.2 + 2.1, y1r * 7.2 + 4.3, 2);
+            if (eFrac * 0.85 > erodeN + 0.16) continue;
+            lum *= 1 - eFrac * 0.28;
+          }
+
+          var ch = rampChar(Math.min(1, lum), true);
           if (ch === " ") continue;
-
-          var lumCode = parseInt(lRow[c], 36) / 35;
-          var px = originX + (c + 0.5) * cellW;
-          var py = originY + (r + 0.5) * cellH;
-
-          // 仅在最右侧极窄 0~5 格边缘施加轻微粒子风化剥蚀，完整保留月球本体真实月海与环形山
-          var distFromRight = rightEdge - c;
-          if (distFromRight <= 5) {
-            edgeEmitters.push({ x: px, y: py, lum: lumCode });
-            var edgeFrac = 1 - distFromRight / 6; // 越靠最右边缘越接近 1
-            var erodeN = fbm(c * 0.22 + 1.4, r * 0.22 + 3.8, 2);
-            if (edgeFrac * 0.88 > erodeN + 0.14) continue;
-            lumCode *= 1 - edgeFrac * 0.28;
-          }
-
-          var alpha = 0.14 + lumCode * 0.86;
+          var alpha = 0.14 + lum * 0.86;
           bctx.fillStyle = "rgba(244, 243, 238, " + alpha.toFixed(2) + ")";
-          bctx.fillText(ch, px, py);
+          bctx.fillText(ch, x, y);
         }
       }
     }
@@ -358,7 +418,7 @@
       var em =
         edgeEmitters.length > 0
           ? edgeEmitters[Math.floor(Math.random() * edgeEmitters.length)]
-          : { x: width * 0.78, y: height * 0.5, lum: 0.8 };
+          : { x: moonGeom.cx + moonGeom.R * 0.85, y: moonGeom.cy, lum: 0.78 };
 
       var speed = (burst ? 1.45 : 0.28) + Math.random() * (burst ? 2.0 : 0.72);
       var drift = -0.24 + (Math.random() - 0.5) * 0.78;
@@ -383,21 +443,29 @@
       canvas.height = Math.floor(height * dpr);
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-      bakeMoonBuffer();
+      var isNarrow = width < 860;
+      moonGeom.R = isNarrow
+        ? Math.min(width * 0.36, height * 0.24)
+        : Math.min(width * 0.27, height * 0.39);
+      moonGeom.cx = isNarrow ? width * 0.62 : width * 0.64;
+      moonGeom.cy = isNarrow ? height * 0.29 : height * 0.49;
 
-      // 深空微缩星点
+      bakeMoonSphere(yaw, pitch);
+
+      // 深空微缩星点（带深度系数，产生 3D 远景视差）
       stars = [];
       var starCount = Math.floor((width * height) / 9500);
       for (var s = 0; s < starCount; s++) {
         stars.push({
           x: Math.random() * width,
           y: Math.random() * height,
+          depth: 0.3 + Math.random() * 0.9,
           phase: Math.random() * Math.PI * 2,
           ch: Math.random() > 0.88 ? "+" : ".",
         });
       }
 
-      // 初始化 620 颗精细风化粒子
+      // 初始化精细风化粒子
       particles = [];
       for (var p = 0; p < maxParticles; p++) {
         var pt = spawnParticle(false);
@@ -416,11 +484,19 @@
       pointer.active = true;
       pointer.x = e.clientX - rect.left;
       pointer.y = e.clientY - rect.top;
+
+      // 鼠标位置映射为 ±22° 水平天平动 + ±18° 垂直俯仰天平动
+      var nx = Math.max(-1, Math.min(1, (pointer.x / rect.width) * 2 - 1));
+      var ny = Math.max(-1, Math.min(1, (pointer.y / rect.height) * 2 - 1));
+      targetYaw = nx * 0.39;
+      targetPitch = -ny * 0.32;
     });
 
     section.addEventListener("pointerleave", function () {
       pointer.active = false;
       pointer.down = false;
+      targetYaw = 0;
+      targetPitch = 0;
     });
 
     section.addEventListener("pointerdown", function (e) {
@@ -448,20 +524,31 @@
       if (!reduceMotion) {
         t += 0.014;
         disperseBoost += ((pointer.down ? 1 : 0) - disperseBoost) * 0.09;
+
+        // 仅在 3D 球面天平动角度变化时重绘离屏月球（停稳后零重绘省电）
+        var dYaw = targetYaw - yaw;
+        var dPitch = targetPitch - pitch;
+        if (Math.abs(dYaw) > 0.0008 || Math.abs(dPitch) > 0.0008) {
+          yaw += dYaw * 0.12;
+          pitch += dPitch * 0.12;
+          bakeMoonSphere(yaw, pitch);
+        }
       }
 
-      // 1. 深空极细微星尘
+      // 1. 深空星尘（叠加随鼠标天平动的轻微三维远景视差）
       ctx.font = '7px "JetBrains Mono", "Cascadia Mono", Consolas, monospace';
       ctx.textBaseline = "middle";
       ctx.textAlign = "center";
       for (var s = 0; s < stars.length; s++) {
         var st = stars[s];
         var tw = 0.12 + 0.22 * (0.5 + 0.5 * Math.sin(t * 1.5 + st.phase));
+        var sxp = st.x - yaw * 26 * st.depth;
+        var syp = st.y + pitch * 18 * st.depth;
         ctx.fillStyle = "rgba(244, 243, 238, " + tw.toFixed(2) + ")";
-        ctx.fillText(st.ch, st.x, st.y);
+        ctx.fillText(st.ch, sxp, syp);
       }
 
-      // 2. 一毫秒贴上预渲染的 8,000+ 字符超高精月球本体
+      // 2. 贴上当前 3D 视角的照片级月球本体
       ctx.drawImage(moonBuffer, 0, 0, width, height);
 
       // 3. 实时风化飘散的微缩 ASCII 粒子
@@ -502,7 +589,6 @@
         var ch = rampChar(lum, false);
         var alpha = Math.max(0.04, fade * 0.88);
 
-        // 贴合细微晶格步长，呈现纯终端字符消散质感
         var gx = Math.round(pt.x / 3) * 3;
         var gy = Math.round(pt.y / 3) * 3;
         ctx.fillStyle = "rgba(244, 243, 238, " + alpha.toFixed(2) + ")";
@@ -510,9 +596,17 @@
       }
 
       if (telemetryEl) {
+        var yd = Math.round((yaw * 180) / Math.PI);
+        var pd2 = Math.round((pitch * 180) / Math.PI);
         telemetryEl.textContent = pointer.down
-          ? "LUNAR PHASE 0.46 · SOLAR WIND DISPERSION ACTIVE"
-          : "LUNAR PHASE 0.46 · FIRST QUARTER · " + moonData.nonEmpty + " PHOTO-ASCII CELLS";
+          ? "LUNAR LIBRATION · SOLAR WIND DISPERSION ACTIVE"
+          : "LUNAR LIBRATION · YAW " +
+            (yd >= 0 ? "+" : "") +
+            yd +
+            "°  PITCH " +
+            (pd2 >= 0 ? "+" : "") +
+            pd2 +
+            "° · 3D PHOTO-SPHERE";
       }
     }
 
