@@ -144,6 +144,44 @@
   // ---------- 2. 渲染 Bento 展板 DOM（大画幅局部特写视口） ----------
   var bentoItems = [];
   var renderCelestialStage = null;
+  var triggerSolarFlare = null;
+
+  // 通用加密终端字符解码波（Kinetic Character Scramble）
+  var SCRAMBLE_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789#/:+*";
+  function scrambleText(node, targetText, durationMs) {
+    if (!node || reduceMotion) {
+      if (node && targetText !== undefined) node.textContent = targetText;
+      return;
+    }
+    var finalStr = targetText !== undefined ? targetText : node.textContent;
+    var dur = durationMs || 420;
+    var start = performance.now();
+    var token = (node.__scrambleToken || 0) + 1;
+    node.__scrambleToken = token;
+
+    function frame(now) {
+      if (node.__scrambleToken !== token) return;
+      var p = Math.min(1, (now - start) / dur);
+      var locked = Math.floor(p * finalStr.length);
+      var out = "";
+      for (var i = 0; i < finalStr.length; i++) {
+        var ch = finalStr[i];
+        if (i < locked || ch === " " || ch === "," || ch === "." || ch === "·" || ch === "/") {
+          out += ch;
+        } else {
+          out += SCRAMBLE_CHARS[(i * 7 + Math.floor(now / 28)) % SCRAMBLE_CHARS.length];
+        }
+      }
+      node.textContent = out;
+      if (p < 1) {
+        requestAnimationFrame(frame);
+      } else {
+        node.textContent = finalStr;
+      }
+    }
+
+    requestAnimationFrame(frame);
+  }
 
   function renderWorks() {
     var grid = $("works-grid");
@@ -499,19 +537,63 @@
       targetPitch = 0;
     });
 
+    var shockwaves = []; // 太阳风 ASCII 圆形冲击波队列
+    var charge = 0;      // 按住蓄力进度 0..1
+
+    function fireSolarFlare(ox, oy, power) {
+      var fx = ox !== undefined ? ox : moonGeom.cx + moonGeom.R * 0.35;
+      var fy = oy !== undefined ? oy : moonGeom.cy;
+      var amp = power || 1;
+      shockwaves.push({
+        x: fx,
+        y: fy,
+        r: 18,
+        maxR: Math.max(width, height) * (0.55 + amp * 0.35),
+        speed: 8.5 + amp * 5.5,
+        alpha: 0.95,
+      });
+      // 冲击波把大量粒子呈放射状炸向深空
+      for (var p = 0; p < particles.length; p++) {
+        var pt = particles[p];
+        var dx = pt.x - fx;
+        var dy = pt.y - fy;
+        var dist = Math.hypot(dx, dy) + 1;
+        var kick = Math.min(9, (420 / dist) * (0.7 + amp * 0.9));
+        pt.vx = (dx / dist) * kick + (Math.random() - 0.5) * 1.2;
+        pt.vy = (dy / dist) * kick + (Math.random() - 0.5) * 1.2;
+      }
+      var extra = Math.floor(45 + amp * 65);
+      for (var b = 0; b < extra; b++) {
+        var np = spawnParticle(true);
+        var ang = Math.random() * Math.PI * 2;
+        var spd = 2.4 + Math.random() * (3.2 + amp * 2.6);
+        np.x = fx + Math.cos(ang) * 12;
+        np.y = fy + Math.sin(ang) * 12;
+        np.vx = Math.cos(ang) * spd;
+        np.vy = Math.sin(ang) * spd;
+        particles.push(np);
+      }
+      if (particles.length > maxParticles + 220) {
+        particles.splice(0, particles.length - (maxParticles + 220));
+      }
+    }
+
+    // 暴露给开场动画与全局命令面板调用
+    triggerSolarFlare = fireSolarFlare;
+
     section.addEventListener("pointerdown", function (e) {
       if (e.target.closest("a, button")) return;
       pointer.down = true;
-      for (var b = 0; b < 55; b++) {
-        particles.push(spawnParticle(true));
-      }
-      if (particles.length > maxParticles + 180) {
-        particles.splice(0, particles.length - (maxParticles + 180));
-      }
+      charge = 0.08;
     });
 
     window.addEventListener("pointerup", function () {
+      if (pointer.down) {
+        var burstPower = Math.max(0.45, charge);
+        fireSolarFlare(pointer.x, pointer.y, burstPower);
+      }
       pointer.down = false;
+      charge = 0;
     });
 
     var t = 0;
@@ -524,6 +606,9 @@
       if (!reduceMotion) {
         t += 0.014;
         disperseBoost += ((pointer.down ? 1 : 0) - disperseBoost) * 0.09;
+        if (pointer.down) {
+          charge = Math.min(1, charge + 0.024);
+        }
 
         // 仅在 3D 球面天平动角度变化时重绘离屏月球（停稳后零重绘省电）
         var dYaw = targetYaw - yaw;
@@ -551,28 +636,37 @@
       // 2. 贴上当前 3D 视角的照片级月球本体
       ctx.drawImage(moonBuffer, 0, 0, width, height);
 
-      // 3. 实时风化飘散的微缩 ASCII 粒子
+      // 3. 实时风化飘散的微缩 ASCII 粒子（长按形成万有引力旋涡吸入，松手冲击波爆发）
       ctx.font = '7.5px "JetBrains Mono", "Cascadia Mono", Consolas, monospace';
       for (var i = 0; i < particles.length; i++) {
         var pt = particles[i];
         if (!reduceMotion) {
-          pt.life += 1 + disperseBoost * 1.5;
+          pt.life += 1 + disperseBoost * 0.9;
           var swirl = Math.sin(t * 1.8 + pt.seed + pt.y * 0.02) * 0.1;
-          pt.x += pt.vx * (1 + disperseBoost * 1.7) + swirl;
-          pt.y += pt.vy * (1 + disperseBoost * 1.4);
+          // 柔和阻尼让爆发后的粒子自然回归慢速漂移
+          pt.vx *= 0.988;
+          pt.vy *= 0.988;
+          pt.x += pt.vx + swirl;
+          pt.y += pt.vy;
 
           if (pointer.active) {
             var pdx = pt.x - pointer.x;
             var pdy = pt.y - pointer.y;
             var pd = Math.hypot(pdx, pdy);
-            if (pd < 110 && pd > 0.1) {
-              var push = (1 - pd / 110) * 1.55;
+            if (pointer.down && pd < 260 && pd > 6) {
+              // 长按：强引力旋涡向鼠标坍缩聚拢
+              var pull = (1 - pd / 260) * (1.2 + charge * 2.4);
+              pt.x -= (pdx / pd) * pull + (pdy / pd) * pull * 0.45;
+              pt.y -= (pdy / pd) * pull - (pdx / pd) * pull * 0.45;
+            } else if (!pointer.down && pd < 115 && pd > 0.1) {
+              // 平时划过：太阳风轻柔吹散
+              var push = (1 - pd / 115) * 1.55;
               pt.x += (pdx / pd) * push;
               pt.y += (pdy / pd) * push;
             }
           }
 
-          if (pt.life >= pt.maxLife || pt.x > width + 24 || pt.y < -24) {
+          if (pt.life >= pt.maxLife || pt.x > width + 36 || pt.x < -36 || pt.y < -36 || pt.y > height + 36) {
             if (i >= maxParticles) {
               particles.splice(i, 1);
               i--;
@@ -587,7 +681,7 @@
         var fade = Math.sin(Math.min(1, prog * 5) * (Math.PI / 2)) * (1 - prog);
         var lum = Math.max(0.05, (1 - prog) * (pt.baseLum || 0.78));
         var ch = rampChar(lum, false);
-        var alpha = Math.max(0.04, fade * 0.88);
+        var alpha = Math.max(0.04, fade * 0.9);
 
         var gx = Math.round(pt.x / 3) * 3;
         var gy = Math.round(pt.y / 3) * 3;
@@ -595,11 +689,52 @@
         ctx.fillText(ch, gx, gy);
       }
 
+      // 4. 长按蓄力引力坍缩 ASCII 环
+      if (pointer.down && pointer.active) {
+        var ringR = Math.max(18, 76 * (1 - charge * 0.68));
+        var dots = 24;
+        ctx.font = '8px "JetBrains Mono", "Cascadia Mono", Consolas, monospace';
+        ctx.fillStyle = "rgba(244, 243, 238, " + (0.45 + charge * 0.5).toFixed(2) + ")";
+        for (var d = 0; d < dots; d++) {
+          var da = (d / dots) * Math.PI * 2 + t * (2.5 + charge * 5);
+          ctx.fillText(
+            d % 3 === 0 ? "+" : ":",
+            pointer.x + Math.cos(da) * ringR,
+            pointer.y + Math.sin(da) * ringR
+          );
+        }
+        ctx.fillText(
+          "[" + String(Math.round(charge * 100)).padStart(3, "0") + "%]",
+          pointer.x,
+          pointer.y - ringR - 12
+        );
+      }
+
+      // 5. 松手后横扫首屏的太阳风 ASCII 圆形冲击波
+      for (var wIdx = shockwaves.length - 1; wIdx >= 0; wIdx--) {
+        var sw = shockwaves[wIdx];
+        sw.r += sw.speed;
+        sw.speed *= 0.975;
+        sw.alpha = Math.max(0, 1 - sw.r / sw.maxR);
+        if (sw.alpha <= 0.02) {
+          shockwaves.splice(wIdx, 1);
+          continue;
+        }
+        var count = Math.max(28, Math.floor((sw.r * Math.PI * 2) / 14));
+        var waveChar = sw.alpha > 0.62 ? "#" : sw.alpha > 0.32 ? "+" : ".";
+        ctx.font = '8px "JetBrains Mono", "Cascadia Mono", Consolas, monospace';
+        ctx.fillStyle = "rgba(244, 243, 238, " + (sw.alpha * 0.78).toFixed(2) + ")";
+        for (var k = 0; k < count; k++) {
+          var a = (k / count) * Math.PI * 2;
+          ctx.fillText(waveChar, sw.x + Math.cos(a) * sw.r, sw.y + Math.sin(a) * sw.r);
+        }
+      }
+
       if (telemetryEl) {
         var yd = Math.round((yaw * 180) / Math.PI);
         var pd2 = Math.round((pitch * 180) / Math.PI);
         telemetryEl.textContent = pointer.down
-          ? "LUNAR LIBRATION · SOLAR WIND DISPERSION ACTIVE"
+          ? "GRAVITY WELL CHARGING · " + Math.round(charge * 100) + "% · RELEASE FOR SOLAR FLARE"
           : "LUNAR LIBRATION · YAW " +
             (yd >= 0 ? "+" : "") +
             yd +
@@ -838,7 +973,8 @@
       return [sx / sl, sy / sl, sz / sl];
     })();
 
-    function renderSaturnOrbit(ctx, w, h, yaw, pitch, bgStars, isHovered) {
+    function renderSaturnOrbit(ctx, w, h, yaw, pitch, bgStars, isHovered, spin) {
+      var spT = spin || 0;
       ctx.clearRect(0, 0, w, h);
 
       // 背景稀疏深空微尘
@@ -948,7 +1084,7 @@
           var alpha = 0;
 
           if (tRing < tSphere) {
-            // 命中土星环：计算土星本体投在后环上的真实阴影
+            // 命中土星环：计算土星本体投在后环上的真实阴影 + 开普勒差速冰晶轨道流转
             var shadowR = 1.0;
             var sB = 2 * (rpx * sunX + rpz * sunZ);
             var sC = rpx * rpx + rpz * rpz - 0.96;
@@ -956,16 +1092,24 @@
             if (sDisc >= 0 && (-sB - Math.sqrt(sDisc)) * 0.5 > 0) {
               shadowR = 0.2;
             }
-            // 近大远小自然纵深明暗微调（克制不爆白）
+            var rRadNow = Math.hypot(rpx, rpz);
+            var ringPhi = Math.atan2(rpz, rpx);
+            // 开普勒定律：内环转得比外环快，绘出细微流动的冰粒亮弧与暗纹
+            var kepler = spT * (1.8 / Math.pow(Math.max(1.2, rRadNow), 1.5));
+            var iceShimmer =
+              0.86 +
+              0.14 * Math.sin(ringPhi * 3 - kepler * 2.2 + rRadNow * 10) +
+              0.09 * Math.cos(ringPhi * 7 - kepler * 3.1);
             var depthCue = Math.max(0.48, Math.min(1.06, dist / tRing));
-            lum = Math.min(0.95, ringDens * 0.88 * shadowR * depthCue);
+            lum = Math.min(0.96, ringDens * 0.88 * iceShimmer * shadowR * depthCue);
             alpha = 0.18 + lum * 0.78;
           } else {
-            // 命中土星主球体：丝滑大气云带 + 真实球面光照 + 物理精确弧形环影
+            // 命中土星主球体：丝滑大气云带（含缓慢自转微纹理）+ 真实球面光照 + 物理精确弧形环影
             var px3 = camX + tSphere * dx;
             var py3 = camY + tSphere * dy;
             var pz3 = camZ + tSphere * dz;
             var lat = py3 * invFlat;
+            var lon = Math.atan2(pz3, px3) - spT * 0.55;
 
             // 扁球体真实法线
             var nrmX = px3;
@@ -974,11 +1118,12 @@
             var nrmL = Math.hypot(nrmX, nrmY, nrmZ);
             var ndotl = Math.max(0, (nrmX * sunX + nrmY * sunY + nrmZ * sunZ) / nrmL);
 
-            // 温润细腻的土星纬向云带
+            // 温润细腻的土星纬向云带 + 缓慢旋转的大气风暴涡纹
             var bands =
-              0.8 +
+              0.79 +
               0.14 * Math.sin(lat * 21) +
-              0.07 * Math.cos(lat * 44);
+              0.07 * Math.cos(lat * 44) +
+              0.05 * Math.sin(lon * 4 + lat * 12);
 
             // 阴影射线：从球面沿 sun 方向查 y = 0 环面，投射精确物理环影
             var ringSh = 1.0;
@@ -1073,8 +1218,9 @@
       ctx.fillText(label, 12, h - 9);
     }
 
-    // 6C. 001 黑洞事件视界 & 引力透镜吸积盘（实时随鼠标 3D 轨道旋转）
-    function renderBlackHoleOrbit(ctx, w, h, yaw, pitch, bgStars, isHovered) {
+    // 6C. 001 黑洞事件视界 & 引力透镜吸积盘（持续旋涡奔涌 + 实时随鼠标 3D 轨道旋转）
+    function renderBlackHoleOrbit(ctx, w, h, yaw, pitch, bgStars, isHovered, spin) {
+      var spT = spin || 0;
       ctx.clearRect(0, 0, w, h);
 
       ctx.font = '6px "JetBrains Mono", "Cascadia Mono", Consolas, monospace';
@@ -1133,11 +1279,12 @@
                 var radialFade =
                   Math.sin(Math.min(1, (r - 1.32) / 0.45) * (Math.PI / 2)) *
                   Math.exp(-(r - 1.45) * 0.56);
-                // 螺旋吸积流丝缕
+                // 螺旋吸积流丝缕：内圈高速顺时针旋涡旋转（开普勒差速）
+                var rotPhi = phi - spT * (1.85 / Math.sqrt(r));
                 var spiral =
                   0.52 +
-                  0.32 * Math.sin(phi * 2 + r * 3.8) +
-                  0.22 * Math.cos(phi * 5 - r * 7.2);
+                  0.32 * Math.sin(rotPhi * 2 + r * 3.8) +
+                  0.22 * Math.cos(rotPhi * 5 - r * 7.2);
                 // 相对论多普勒增亮：顺时针切向速度 (-pz/r, 0, px/r) 朝向相机一侧更耀眼
                 var vx = -pz / r;
                 var vz = px / r;
@@ -1164,12 +1311,12 @@
             var photon = Math.exp(-Math.pow((b - (bhR + 0.07)) / 0.075, 2)) * 1.05;
             lum = Math.max(lum, photon);
 
-            // 4) 引力透镜弯折的背面吸积盘上下拱弧（平视时如《星际穿越》对称光拱）
+            // 4) 引力透镜弯折的背面吸积盘上下拱弧（纹理随吸积盘同步流动）
             if (b > bhR + 0.04 && b < 2.35) {
               var lensBand = Math.exp(-Math.pow((b - 1.32) / 0.36, 2));
               var screenUp = Math.abs(cy) / (b + 0.001);
               var lensedAng = Math.atan2(cy, cx);
-              var lensedStreak = 0.65 + 0.35 * Math.sin(lensedAng * 7 + b * 11);
+              var lensedStreak = 0.65 + 0.35 * Math.sin(lensedAng * 7 + b * 11 - spT * 2.1);
               var lensedLum = lensBand * (0.35 + 0.65 * screenUp) * edgeOnFactor * lensedStreak * 0.96;
               lum = Math.max(lum, lensedLum);
             }
@@ -1187,8 +1334,9 @@
       drawOrbitLabel(ctx, h, yaw, pitch, isHovered, "MOVE CURSOR TO ORBIT BLACK HOLE 3D");
     }
 
-    // 6D. 002 脉冲星相对论双极喷流 & 真 3D 偶极磁层笼（实时随鼠标 3D 轨道旋转）
-    function renderPulsarOrbit(ctx, w, h, yaw, pitch, bgStars, isHovered) {
+    // 6D. 002 脉冲星相对论双极喷流 & 真 3D 偶极磁层笼（持续高速自转喷射 + 实时随鼠标 3D 轨道旋转）
+    function renderPulsarOrbit(ctx, w, h, yaw, pitch, bgStars, isHovered, spin) {
+      var spT = spin || 0;
       ctx.clearRect(0, 0, w, h);
 
       ctx.font = '6px "JetBrains Mono", "Cascadia Mono", Consolas, monospace';
@@ -1251,14 +1399,14 @@
               var jetR = 0.055 + absY * 0.105;
               if (dAxis < jetR * 2.5 && absY < 3.6) {
                 var profile = Math.exp(-Math.pow(dAxis / jetR, 2));
-                var knots = 0.68 + 0.32 * Math.sin(absY * 11 - 0.8);
+                var knots = 0.65 + 0.35 * Math.sin(absY * 11 - spT * 4.8);
                 var decay = Math.exp(-absY * 0.34);
                 lum = Math.max(lum, profile * knots * decay * 1.08);
               }
             }
           }
 
-          // 3) 真 3D 偶极磁层笼（8 片经向磁力线扇叶 r = L * sin²θ，随鼠标真三维交错旋转）
+          // 3) 真 3D 偶极磁层笼（8 片经向磁力线扇叶 r = L * sin²θ 绕磁轴持续三维自转）
           for (var si = 0; si < sliceOffsets.length; si++) {
             var tS = tClose + sliceOffsets[si];
             if (tS <= 0.2) continue;
@@ -1275,8 +1423,8 @@
             var L = rr / (sinTheta * sinTheta);
             if (L < 0.85 || L > 4.2) continue;
 
-            // 8 片立体经向扇叶 + 嵌套壳层波纹
-            var azim = Math.atan2(pz, px);
+            // 8 片立体经向扇叶持续绕磁轴自转 + 嵌套壳层波纹
+            var azim = Math.atan2(pz, px) - spT * 1.05;
             var lobeMask = Math.pow(0.5 + 0.5 * Math.cos(azim * 4), 5);
             var shellMask = Math.pow(0.5 + 0.5 * Math.cos(L * 9.5), 7);
             var depthWeight = Math.max(0.4, Math.min(1.1, dist / tS));
@@ -1296,14 +1444,15 @@
       drawOrbitLabel(ctx, h, yaw, pitch, isHovered, "MOVE CURSOR TO ORBIT PULSAR 3D");
     }
 
-    // 统一路由三张卡片与全屏大展台的实时 3D 轨道渲染
+    // 统一路由三张卡片与全屏大展台的实时 3D 轨道渲染（支持持续动态自转 + 鼠标视角变换）
     function renderCard3D(item, ctx, w, h) {
+      var spin = item.spin || 0;
       if (item.kind === "rings") {
-        renderSaturnOrbit(ctx, w, h, item.yaw, item.pitch, item.stars || [], item.hovered);
+        renderSaturnOrbit(ctx, w, h, item.yaw, item.pitch, item.stars || [], item.hovered, spin);
       } else if (item.kind === "orbit") {
-        renderBlackHoleOrbit(ctx, w, h, item.yaw, item.pitch, item.stars || [], item.hovered);
+        renderBlackHoleOrbit(ctx, w, h, item.yaw, item.pitch, item.stars || [], item.hovered, spin);
       } else {
-        renderPulsarOrbit(ctx, w, h, item.yaw, item.pitch, item.stars || [], item.hovered);
+        renderPulsarOrbit(ctx, w, h, item.yaw, item.pitch, item.stars || [], item.hovered, spin);
       }
     }
 
@@ -1375,35 +1524,58 @@
     rebuildAllBento();
     window.addEventListener("resize", rebuildAllBento);
 
-    // 统一按需 3D 重绘循环：只有正在旋转或阻尼归位中的卡片才重绘，静置 0% CPU
+    // 统一 3D 动态旋转 + 鼠标视角追踪循环（滚出视口或全屏展台开启时自动休眠省电）
     var worksSec = $("works");
     var visible = true;
     var rafId = null;
+    var lastFrameTime = 0;
 
-    function tickCards3D() {
+    function tickCards3D(now) {
       if (!visible) {
         rafId = null;
         return;
       }
 
-      bentoItems.forEach(function (item) {
-        var dy = item.targetYaw - item.yaw;
-        var dp = item.targetPitch - item.pitch;
-        var hoverChanged = item.lastHoverState !== item.hovered;
+      var ts = now || performance.now();
+      if (!lastFrameTime) lastFrameTime = ts;
+      var dt = Math.min(0.06, Math.max(0.008, (ts - lastFrameTime) / 1000));
 
-        if (Math.abs(dy) > 0.0015 || Math.abs(dp) > 0.0015 || hoverChanged) {
-          item.yaw += dy * 0.14;
-          item.pitch += dp * 0.14;
-          item.lastHoverState = item.hovered;
+      // 只要全屏项目展台盖住画面，暂停背后 3 张小卡重绘
+      if (!stageState.open) {
+        var anyInteractive = bentoItems.some(function (it) {
+          return (
+            it.hovered ||
+            Math.abs(it.targetYaw - it.yaw) > 0.003 ||
+            Math.abs(it.targetPitch - it.pitch) > 0.003
+          );
+        });
+        // 鼠标交互时满血 60fps；无人操作巡航自转时稳锁 ~30fps 丝滑省电
+        var minInterval = anyInteractive ? 15 : 33;
+        if (ts - lastFrameTime >= minInterval) {
+          lastFrameTime = ts;
+          bentoItems.forEach(function (item, idx) {
+            item.spin = (item.spin || 0) + dt;
+            // 未悬停时叠加一道极柔和的自主视角巡航；鼠标划入立刻平滑交由鼠标精准掌控
+            var desiredYaw = item.hovered
+              ? item.targetYaw
+              : item.baseYaw + Math.sin(item.spin * 0.42 + idx * 2.1) * 0.2;
+            var desiredPitch = item.hovered
+              ? item.targetPitch
+              : item.basePitch + Math.cos(item.spin * 0.34 + idx * 1.4) * 0.06;
 
-          var canvas = item.motifCanvas;
-          var w = canvas.width / dpr;
-          var h = canvas.height / dpr;
-          var ctx = canvas.getContext("2d");
-          ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-          renderCard3D(item, ctx, w, h);
+            item.yaw += (desiredYaw - item.yaw) * (item.hovered ? 0.15 : 0.08);
+            item.pitch += (desiredPitch - item.pitch) * (item.hovered ? 0.15 : 0.08);
+            item.lastHoverState = item.hovered;
+
+            var canvas = item.motifCanvas;
+            var w = canvas.width / dpr;
+            var h = canvas.height / dpr;
+            var ctx = canvas.getContext("2d");
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            renderCard3D(item, ctx, w, h);
+          });
         }
-      });
+      }
 
       rafId = window.requestAnimationFrame(tickCards3D);
     }
@@ -1525,26 +1697,53 @@
 
       if (!reduceMotion) t += 0.025;
 
-      // 星团亮星微闪
+      // 星团亮星微闪 + 鼠标星座连线网（Constellation Web）
       ctx.font = '7.5px "JetBrains Mono", "Cascadia Mono", Consolas, monospace';
       ctx.textBaseline = "middle";
       ctx.textAlign = "center";
+
+      var nearStars = [];
       for (var i = 0; i < clusterStars.length; i++) {
         var st = clusterStars[i];
+        var driftX = st.x + Math.sin(t * 0.35 + st.phase) * 4;
+        var driftY = st.y + Math.cos(t * 0.28 + st.phase) * 3;
         var pulse = 0.22 + 0.65 * Math.pow(0.5 + 0.5 * Math.sin(t + st.phase), 3);
         ctx.fillStyle = "rgba(255, 255, 255, " + pulse.toFixed(2) + ")";
-        ctx.fillText(pulse > 0.65 ? "+" : "*", st.x, st.y);
+        ctx.fillText(pulse > 0.65 ? "+" : "*", driftX, driftY);
+
+        if (pointer.active) {
+          var distM = Math.hypot(driftX - pointer.x, driftY - pointer.y);
+          if (distM < 175) {
+            nearStars.push({ x: driftX, y: driftY, d: distM });
+          }
+        }
       }
 
-      // 鼠标划过星云时亮起一圈细腻的微缩字符星光
-      if (pointer.active) {
-        for (var a = 0; a < 18; a++) {
-          var ang = (a / 18) * Math.PI * 2 + t * 0.4;
-          var rad = 22 + (a % 3) * 18;
-          var gx = Math.round((pointer.x + Math.cos(ang) * rad) / 6) * 6;
-          var gy = Math.round((pointer.y + Math.sin(ang) * rad) / 9) * 9;
-          ctx.fillStyle = "rgba(244, 243, 238, 0.38)";
-          ctx.fillText(a % 2 === 0 ? "+" : ".", gx, gy);
+      // 在鼠标附近的亮星间拉出 0.7px 精密星座连线，像亲手在漆黑夜空点亮星图
+      if (pointer.active && nearStars.length > 0) {
+        nearStars.sort(function (a, b) {
+          return a.d - b.d;
+        });
+        var pick = nearStars.slice(0, 7);
+        ctx.lineWidth = 0.7;
+        for (var p = 0; p < pick.length; p++) {
+          var a1 = (1 - pick[p].d / 175) * 0.42;
+          ctx.strokeStyle = "rgba(244, 243, 238, " + a1.toFixed(2) + ")";
+          ctx.beginPath();
+          ctx.moveTo(pointer.x, pointer.y);
+          ctx.lineTo(pick[p].x, pick[p].y);
+          ctx.stroke();
+
+          if (p + 1 < pick.length) {
+            var segD = Math.hypot(pick[p].x - pick[p + 1].x, pick[p].y - pick[p + 1].y);
+            if (segD < 150) {
+              ctx.strokeStyle = "rgba(244, 243, 238, " + (a1 * 0.65).toFixed(2) + ")";
+              ctx.beginPath();
+              ctx.moveTo(pick[p].x, pick[p].y);
+              ctx.lineTo(pick[p + 1].x, pick[p + 1].y);
+              ctx.stroke();
+            }
+          }
         }
       }
     }
@@ -1684,19 +1883,31 @@
     renderCelestialStage(stageState.view, ctx, w, h);
   }
 
-  function tickStage3D() {
+  var lastStageTime = 0;
+
+  function tickStage3D(now) {
     if (!stageState.open) {
       stageState.rafId = null;
+      lastStageTime = 0;
       return;
     }
+    var ts = now || performance.now();
+    if (!lastStageTime) lastStageTime = ts;
     var v = stageState.view;
-    var dy = v.targetYaw - v.yaw;
-    var dp = v.targetPitch - v.pitch;
-    var hoverChanged = v.lastHoverState !== v.hovered;
+    var interactive =
+      v.hovered ||
+      Math.abs(v.targetYaw - v.yaw) > 0.003 ||
+      Math.abs(v.targetPitch - v.pitch) > 0.003;
+    var interval = interactive ? 16 : 30;
 
-    if (Math.abs(dy) > 0.0012 || Math.abs(dp) > 0.0012 || hoverChanged) {
-      v.yaw += dy * 0.14;
-      v.pitch += dp * 0.14;
+    if (ts - lastStageTime >= interval) {
+      var dt = Math.min(0.06, (ts - lastStageTime) / 1000);
+      lastStageTime = ts;
+      v.spin = (v.spin || 0) + dt;
+      var desiredYaw = v.hovered ? v.targetYaw : v.baseYaw + Math.sin(v.spin * 0.36) * 0.18;
+      var desiredPitch = v.hovered ? v.targetPitch : v.basePitch + Math.cos(v.spin * 0.28) * 0.05;
+      v.yaw += (desiredYaw - v.yaw) * (v.hovered ? 0.14 : 0.07);
+      v.pitch += (desiredPitch - v.pitch) * (v.hovered ? 0.14 : 0.07);
       v.lastHoverState = v.hovered;
       drawStageFrame();
     }
@@ -1913,9 +2124,10 @@
     var proj = record.proj;
     stageState.idx = idx;
 
-    // 承接卡片当前的 3D 视角角度，丝滑放大不跳变
+    // 承接卡片当前的 3D 视角角度与旋转相位，丝滑放大不跳变
     var v = stageState.view;
     v.kind = record.kind;
+    v.spin = record.spin || 0;
     v.baseYaw = record.baseYaw !== undefined ? record.baseYaw : -0.3;
     v.basePitch = record.basePitch !== undefined ? record.basePitch : 0.24;
     v.yaw = record.yaw !== undefined ? record.yaw : v.baseYaw;
@@ -2218,16 +2430,40 @@
     sceneState.animating = true;
     sceneState.lockUntil = startTime + 740; // 吃掉触控板惯性尾波，防一滑连跳两幕
 
-    // 非线性强张力 Expo-Out：前 22% 时间疾驰过 80% 路程，后程磁吸丝滑刹停
+    // 非线性强张力 Expo-Out：前 22% 时间疾驰过 80% 路程，后程磁吸丝滑刹停 + 速度感弹性微倾斜
     function easeOutExpo(t) {
       return t >= 1 ? 1 : 1 - Math.pow(2, -10.5 * t);
+    }
+
+    var skewTargets = Array.prototype.slice.call(
+      document.querySelectorAll(".bento-grid, .ledger, .stack-matrix")
+    );
+    var lastScrollY = startY;
+
+    if (nextSec && prevIdx !== targetIdx) {
+      var kicker = nextSec.querySelector(".mono-kicker, .hero__kicker");
+      if (kicker) {
+        if (!kicker.dataset.orig) kicker.dataset.orig = kicker.textContent;
+        setTimeout(function () {
+          scrambleText(kicker, kicker.dataset.orig, 300);
+        }, 140);
+      }
     }
 
     function step(now) {
       var elapsed = now - startTime;
       var t = Math.min(1, elapsed / duration);
       var eased = easeOutExpo(t);
-      window.scrollTo(0, Math.round(startY + delta * eased));
+      var nextY = Math.round(startY + delta * eased);
+      var vel = nextY - lastScrollY;
+      lastScrollY = nextY;
+      window.scrollTo(0, nextY);
+
+      var skewDeg = Math.max(-1.6, Math.min(1.6, vel * 0.018));
+      skewTargets.forEach(function (elSkew) {
+        elSkew.style.transform =
+          Math.abs(skewDeg) > 0.04 ? "skewY(" + skewDeg.toFixed(2) + "deg)" : "";
+      });
 
       if (t < 1) {
         sceneState.rafId = requestAnimationFrame(step);
@@ -2235,6 +2471,9 @@
         sceneState.rafId = null;
         sceneState.animating = false;
         window.scrollTo(0, targetY);
+        skewTargets.forEach(function (elSkew) {
+          elSkew.style.transform = "";
+        });
         setTimeout(function () {
           if (prevSec) prevSec.classList.remove("is-departing");
           if (nextSec) nextSec.classList.remove("is-entering-down", "is-entering-up");
@@ -2275,8 +2514,8 @@
       function (e) {
         if (reduceMotion) return;
         if (window.innerWidth <= 960) return;
-        if (stageState.open) return; // 全屏项目档案打开时不拦截滚轮
-        if (e.ctrlKey || e.metaKey) return; // 不干扰页面缩放
+        if (stageState.open) return; // 全屏档案打开时不拦截
+        if (e.ctrlKey || e.metaKey) return;
 
         var now = performance.now();
         if (sceneState.animating || now < sceneState.lockUntil) {
@@ -2295,12 +2534,10 @@
         var viewBot = viewTop + window.innerHeight;
         var secTop = sec.offsetTop;
         var secBot = secTop + sec.offsetHeight;
-        // 最后一幕把页脚算进来
         if (idx === sceneDefs.length - 1) {
           secBot = document.documentElement.scrollHeight;
         }
 
-        // 若该幕本身比视口更高，且还没滚到该幕边界，先放行原生滚动看全内容
         if (dir > 0 && secBot > viewBot + 24) return;
         if (dir < 0 && viewTop > secTop + 24) return;
 
@@ -2332,7 +2569,8 @@
       }
     });
 
-    // 手动拖滚动条时保持右下角 HUD 同步准确
+    // 巨型背景数字 03 深度视差 + 手动拖滚动条同步 HUD
+    var giantNum = $("works-count");
     window.addEventListener(
       "scroll",
       function () {
@@ -2340,11 +2578,116 @@
           var detected = detectClosestScene();
           if (detected !== sceneState.current) syncSceneHUD(detected);
         }
+        if (giantNum && !reduceMotion) {
+          var wSec = $("works");
+          if (wSec) {
+            var rel = (window.scrollY - wSec.offsetTop) * 0.14;
+            giantNum.style.transform = "translateY(" + Math.max(-42, Math.min(42, rel)).toFixed(1) + "px)";
+          }
+        }
       },
       { passive: true }
     );
 
     syncSceneHUD(detectClosestScene());
+  }
+
+  // ---------- 12. 终端表悬停解码 + 主票据按钮磁吸 ----------
+  function initMicroPolish() {
+    if (reduceMotion) return;
+
+    // 终端点线清单悬停状态词解码
+    document.querySelectorAll(".ledger-row").forEach(function (row) {
+      var st = row.querySelector(".ledger-row__state");
+      if (!st) return;
+      var orig = st.textContent;
+      row.addEventListener("pointerenter", function () {
+        scrambleText(st, orig, 240);
+      });
+    });
+
+    var hasFine = window.matchMedia && window.matchMedia("(pointer: fine)").matches;
+    if (!hasFine) return;
+
+    // 主票据按钮磁吸牵引
+    document.querySelectorAll(".ticket-btn").forEach(function (btn) {
+      btn.addEventListener("pointermove", function (e) {
+        var r = btn.getBoundingClientRect();
+        var dx = ((e.clientX - r.left) / r.width - 0.5) * 12;
+        var dy = ((e.clientY - r.top) / r.height - 0.5) * 9;
+        btn.style.transform = "translate(" + dx.toFixed(1) + "px," + dy.toFixed(1) + "px)";
+      });
+      btn.addEventListener("pointerleave", function () {
+        btn.style.transform = "";
+      });
+    });
+  }
+
+  // ---------- 13. 打孔票据 3D 实体倾斜透视 + 单色纸面微光 + 精密条形码 ----------
+  function initReceipt3D() {
+    var receipt = document.querySelector(".receipt");
+    var barcode = $("receipt-barcode");
+
+    if (barcode) {
+      barcode.innerHTML = "";
+      var pattern = [2, 1, 3, 1, 1, 2, 4, 1, 2, 1, 1, 3, 2, 1, 2, 1, 3, 1, 1, 2, 1, 4, 1, 2, 1, 3, 1, 2, 2, 1, 3, 1, 1, 2];
+      pattern.forEach(function (w, i) {
+        var bar = el("span", "barcode-bar");
+        bar.style.flex = w + " 1 0";
+        bar.style.opacity = i % 3 === 0 ? "0.9" : "0.52";
+        barcode.appendChild(bar);
+      });
+    }
+
+    if (!receipt || reduceMotion) return;
+    var hasFine = window.matchMedia && window.matchMedia("(pointer: fine)").matches;
+    if (!hasFine) return;
+
+    receipt.addEventListener("pointermove", function (e) {
+      var r = receipt.getBoundingClientRect();
+      var px = (e.clientX - r.left) / r.width;
+      var py = (e.clientY - r.top) / r.height;
+      var rotY = (px - 0.5) * 11;
+      var rotX = (0.5 - py) * 9;
+      receipt.style.setProperty("--rx", (px * 100).toFixed(1) + "%");
+      receipt.style.setProperty("--ry", (py * 100).toFixed(1) + "%");
+      receipt.style.transform =
+        "rotateX(" + rotX.toFixed(2) + "deg) rotateY(" + rotY.toFixed(2) + "deg) translateY(-3px)";
+    });
+
+    receipt.addEventListener("pointerleave", function () {
+      receipt.style.transform = "";
+    });
+  }
+
+  // ---------- 14. 独立黑白极性反相按钮（◐ INV） ----------
+  function initInvertToggle() {
+    var btn = $("invert-btn");
+    if (!btn) return;
+    btn.addEventListener("click", function () {
+      var inverted = document.documentElement.classList.toggle("polarity-invert");
+      btn.setAttribute("aria-pressed", String(inverted));
+      showToast(inverted ? "POLARITY: INVERTED" : "POLARITY: STANDARD");
+    });
+  }
+
+  // ---------- 15. 开场加密字符解码序列 ----------
+  function runBootSequence() {
+    if (reduceMotion) return;
+    var kicker = $("hero-kicker");
+    var lead = $("hero-lead");
+    if (kicker) scrambleText(kicker, kicker.textContent, 520);
+    if (lead) {
+      setTimeout(function () {
+        scrambleText(lead, lead.textContent, 680);
+      }, 90);
+    }
+    // 首屏落定 280ms 后放出一圈柔和的开场太阳风 ASCII 脉冲环
+    setTimeout(function () {
+      if (triggerSolarFlare && window.scrollY < 100) {
+        triggerSolarFlare(undefined, undefined, 0.55);
+      }
+    }, 280);
   }
 
   // ---------- 启动 ----------
@@ -2358,4 +2701,8 @@
   initLunarCanvas();
   initBentoVisuals();
   initNebulaCanvas();
+  initMicroPolish();
+  initReceipt3D();
+  initInvertToggle();
+  runBootSequence();
 })();

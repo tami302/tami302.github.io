@@ -442,7 +442,7 @@ button {
   justify-content: space-between;
   gap: 16px;
   padding-top: 18px;
-  padding-right: 224px;
+  padding-right: 268px;
   border-top: 1px solid rgba(255, 255, 255, 0.1);
   font-family: var(--font-mono);
   font-size: 0.7rem;
@@ -1644,6 +1644,142 @@ button {
 .scene-hud__btn:disabled {
   opacity: 0.24;
   cursor: default;
+}
+
+.scene-hud__sep {
+  width: 1px;
+  height: 14px;
+  margin: 0 4px;
+  background: rgba(244, 243, 238, 0.22);
+}
+
+.scene-hud--light .scene-hud__sep {
+  background: rgba(17, 17, 17, 0.24);
+}
+
+.scene-hud__invert {
+  height: 24px;
+  padding: 0 9px;
+  border: 1px solid rgba(244, 243, 238, 0.26);
+  border-radius: 2px;
+  background: transparent;
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: background-color 150ms ease, color 150ms ease, border-color 150ms ease;
+}
+
+.scene-hud--light .scene-hud__invert {
+  border-color: rgba(17, 17, 17, 0.3);
+}
+
+.scene-hud__invert:hover,
+.scene-hud__invert[aria-pressed="true"] {
+  background: var(--bright);
+  color: var(--void);
+  border-color: var(--bright);
+}
+
+.scene-hud--light .scene-hud__invert:hover,
+.scene-hud--light .scene-hud__invert[aria-pressed="true"] {
+  background: var(--ink);
+  color: var(--paper);
+  border-color: var(--ink);
+}
+
+/* ============================================================
+   炫技层 1：全站黑白极性反相（Polarity Invert Mode）
+   ============================================================ */
+html {
+  transition: filter 420ms var(--ease);
+}
+
+html.polarity-invert {
+  filter: invert(1);
+}
+
+/* ============================================================
+   炫技层 2：幕间高速快切速度弹性倾斜 + 巨型背景视差
+   ============================================================ */
+.bento-grid,
+.ledger,
+.stack-matrix,
+.receipt {
+  will-change: transform;
+}
+
+.giant-num {
+  will-change: transform;
+  transition: transform 140ms linear;
+}
+
+/* ============================================================
+   炫技层 3：打孔票据 3D 实体倾斜透视 + 单色光泽 + 精密条形码
+   ============================================================ */
+.contact__grid {
+  perspective: 1100px;
+}
+
+.receipt {
+  position: relative;
+  transform-style: preserve-3d;
+  transition: transform 220ms var(--ease), box-shadow 260ms ease;
+}
+
+.receipt::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  background: radial-gradient(
+    320px circle at var(--rx, 50%) var(--ry, 50%),
+    rgba(255, 255, 255, 0.12),
+    transparent 62%
+  );
+  transition: opacity 240ms ease;
+}
+
+.receipt:hover::after {
+  opacity: 1;
+}
+
+.receipt__barcode {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px dashed rgba(244, 243, 238, 0.16);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.barcode-bars {
+  display: flex;
+  align-items: stretch;
+  justify-content: space-between;
+  gap: 2px;
+  height: 22px;
+}
+
+.barcode-bar {
+  background: rgba(244, 243, 238, 0.72);
+  transition: transform 200ms var(--ease), opacity 200ms ease;
+}
+
+.receipt:hover .barcode-bar {
+  background: rgba(244, 243, 238, 0.92);
+}
+
+.barcode-code {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.12em;
+  color: var(--bright-muted);
+  text-align: center;
 }
 
 @media (prefers-reduced-motion: reduce) {

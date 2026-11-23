@@ -238,6 +238,12 @@
               <span class="receipt__val">OPEN TO SHARP IDEAS</span>
               <span class="receipt__dot" aria-hidden="true">■</span>
             </div>
+
+            <!-- 精密天文观测票据条形码 -->
+            <div class="receipt__barcode" aria-hidden="true">
+              <div class="barcode-bars" id="receipt-barcode"></div>
+              <span class="barcode-code">OBS-2026 · 31.28N 121.50E · TONGJI SHANGHAI</span>
+            </div>
           </div>
         </aside>
       </div>
@@ -322,11 +328,19 @@
     </div>
   </div>
 
-  <!-- 右下角极简分幕游标指示器 -->
+  <!-- 右下角极简分幕游标指示器 + 独立黑白极性反相按钮 -->
   <div class="scene-hud" id="scene-hud" aria-label="Current section indicator">
     <button type="button" class="scene-hud__btn" id="scene-prev" aria-label="Previous scene">↑</button>
     <span class="scene-hud__readout" id="scene-readout">00 / 03 · LUNAR</span>
     <button type="button" class="scene-hud__btn" id="scene-next" aria-label="Next scene">↓</button>
+    <span class="scene-hud__sep" aria-hidden="true"></span>
+    <button
+      type="button"
+      class="scene-hud__invert"
+      id="invert-btn"
+      aria-pressed="false"
+      title="Toggle black/white polarity invert"
+    >◐ INV</button>
   </div>
 
   <!-- 黑白极简 Toast -->
